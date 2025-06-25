@@ -224,7 +224,26 @@ Para soporte técnico:
 1. Revisar [documentación detallada](docs/sprint1.md)
 2. Ejecutar `.\manage.ps1 test` para diagnóstico
 3. Revisar logs con `.\manage.ps1 logs`
-4. Crear issue en el repositorio
+4. Crear [issue en GitHub](https://github.com/sebastian-alejandro/ansible-docker/issues)
+
+## 🤝 Contribuir
+
+¡Las contribuciones son bienvenidas! Por favor revisa:
+- [Guía de Contribución](CONTRIBUTING.md)
+- [Código de Conducta](CONTRIBUTING.md#-código-de-conducta)
+- [Templates de Issues](.github/ISSUE_TEMPLATE/)
+
+## 📋 Changelog
+
+Ver [CHANGELOG.md](CHANGELOG.md) para detalles de todas las versiones y cambios.
+
+## 📄 Licencia
+
+Este proyecto está bajo [Licencia MIT](LICENSE). Ver el archivo LICENSE para más detalles.
+
+---
 
 **Estado del Proyecto:** 🟢 Sprint 1 Completado  
+**Versión Actual:** v1.0.1  
+**Repositorio:** https://github.com/sebastian-alejandro/ansible-docker  
 **Última Actualización:** Junio 2025
