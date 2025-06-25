@@ -1,0 +1,240 @@
+# ===================================
+# CI/CD Pipeline - Ansible Docker Environment
+# ===================================
+
+name: 🐳 Docker Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: sebastian-alejandro/ansible-docker
+
+jobs:
+  # ===================================
+  # Lint y Validación
+  # ===================================
+  lint:
+    name: 🔍 Lint & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: centos9/Dockerfile
+          failure-threshold: warning
+
+      - name: Validate Docker Compose
+        run: |
+          docker-compose config
+
+      - name: Validate PowerShell Scripts
+        shell: pwsh
+        run: |
+          # Instalar PSScriptAnalyzer
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+          
+          # Analizar script de gestión
+          $results = Invoke-ScriptAnalyzer -Path manage.ps1 -Severity Warning
+          if ($results) {
+            $results | Format-Table
+            Write-Error "PowerShell script analysis found issues"
+          }
+
+  # ===================================
+  # Build y Test de Containers
+  # ===================================
+  build-test:
+    name: 🔨 Build & Test
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      matrix:
+        platform: [linux/amd64]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build CentOS 9 Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./centos9
+          platforms: ${{ matrix.platform }}
+          push: false
+          tags: centos9-ansible:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Container Startup
+        run: |
+          # Iniciar container de prueba
+          docker run -d --name test-centos9 \
+            -p 2201:22 \
+            centos9-ansible:test
+
+          # Esperar que el container inicie
+          sleep 30
+
+          # Verificar que el container está ejecutándose
+          docker ps | grep test-centos9
+
+          # Verificar health check
+          docker inspect test-centos9 --format='{{.State.Health.Status}}'
+
+      - name: Test SSH Connectivity
+        run: |
+          # Instalar cliente SSH
+          sudo apt-get update
+          sudo apt-get install -y openssh-client sshpass
+
+          # Probar conexión SSH (puede fallar por configuración de red en CI)
+          # Este test es informativo
+          timeout 10 sshpass -p 'ansible123' ssh -o StrictHostKeyChecking=no \
+            ansible@localhost -p 2201 'echo "SSH connection successful"' || true
+
+      - name: Test Container Health
+        run: |
+          # Ejecutar health check manualmente
+          docker exec test-centos9 /usr/local/bin/health-check.sh
+
+          # Verificar servicios internos
+          docker exec test-centos9 systemctl is-active sshd
+          docker exec test-centos9 id ansible
+          docker exec test-centos9 python3 --version
+
+      - name: Cleanup Test Container
+        if: always()
+        run: |
+          docker stop test-centos9 || true
+          docker rm test-centos9 || true
+
+  # ===================================
+  # Build Multi-Container Test
+  # ===================================
+  integration-test:
+    name: 🔗 Integration Test
+    runs-on: ubuntu-latest
+    needs: build-test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start Multi-Container Environment
+        run: |
+          # Iniciar ambiente completo
+          docker-compose up -d
+
+          # Esperar que los containers inicien
+          sleep 60
+
+      - name: Test Multi-Container Setup
+        run: |
+          # Verificar que todos los containers están ejecutándose
+          docker-compose ps
+          
+          # Verificar health de cada container
+          docker-compose exec -T centos9-node1 /usr/local/bin/health-check.sh
+          docker-compose exec -T centos9-node2 /usr/local/bin/health-check.sh
+
+          # Verificar conectividad entre containers
+          docker-compose exec -T centos9-node1 ping -c 2 centos9-node2
+          docker-compose exec -T centos9-node2 ping -c 2 centos9-node1
+
+      - name: Test Network Configuration
+        run: |
+          # Verificar configuración de red
+          docker network ls | grep ansible-network
+          docker network inspect ansible-network
+
+      - name: Cleanup Integration Test
+        if: always()
+        run: |
+          docker-compose down -v
+          docker system prune -f
+
+  # ===================================
+  # Release y Deploy (solo en tags)
+  # ===================================
+  release:
+    name: 🚀 Release
+    runs-on: ubuntu-latest
+    needs: [lint, build-test, integration-test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./centos9
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## 🚀 Nueva Release - Ansible Docker Environment
+            
+            ### Cambios en esta versión:
+            - Ver [CHANGELOG.md](CHANGELOG.md) para detalles completos
+            
+            ### Instalación:
+            ```bash
+            git clone https://github.com/sebastian-alejandro/ansible-docker.git
+            cd ansible-docker
+            docker-compose up -d
+            ```
+            
+            ### Imágenes Docker:
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}`
+            
+            ### Documentación:
+            - [README.md](README.md)
+            - [Sprint Documentation](docs/)
+          draft: false
+          prerelease: false

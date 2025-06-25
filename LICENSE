@@ -1,0 +1,49 @@
+MIT License
+
+Copyright (c) 2025 Sebastian Alejandro - Ansible Docker Environment
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Sobre el Proyecto
+
+**Ansible Docker Environment** es un proyecto de código abierto que proporciona
+un ambiente completo de desarrollo y testing para Ansible utilizando containers
+Docker con CentOS 9 Stream.
+
+### Características Principales:
+- Containers CentOS 9 optimizados para Ansible
+- Scripts de automatización y gestión
+- Documentación completa y ejemplos
+- Arquitectura escalable y modular
+
+### Contribuciones:
+Las contribuciones son bienvenidas. Por favor, revisa las guías de contribución
+en el README.md antes de enviar pull requests.
+
+### Soporte:
+Para reportar bugs o solicitar features, utiliza el sistema de issues de GitHub:
+https://github.com/sebastian-alejandro/ansible-docker/issues
+
+---
+
+**Proyecto iniciado:** Junio 2025  
+**Autor principal:** Sebastian Alejandro  
+**Repositorio:** https://github.com/sebastian-alejandro/ansible-docker
