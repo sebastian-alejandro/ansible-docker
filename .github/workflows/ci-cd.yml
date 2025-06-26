@@ -36,7 +36,7 @@ jobs:
   # 1. BUILD TESTS - Construcción y Validación
   # ===================================
   build-tests:
-    name: � Build Tests
+    name: 🔨 Build Tests
     runs-on: ubuntu-latest
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
@@ -165,14 +165,22 @@ jobs:
           echo "🚀 Starting container for functional tests..."
           docker run -d --name test-functional \
             -p 2299:22 \
+            --health-cmd="/usr/local/bin/health-check.sh" \
             --health-interval=10s \
             --health-timeout=5s \
             --health-retries=3 \
+            --health-start-period=30s \
             ${{ env.CONTAINER_NAME }}:test
+          
+          # Wait for container to be ready and SSH service to start
+          echo "⏳ Waiting for container to start..."
+          sleep 20
           
           # Wait for container to be healthy
           echo "⏳ Waiting for container to be healthy..."
-          timeout 60 bash -c 'until [ "$(docker inspect --format=\"{{.State.Health.Status}}\" test-functional)" == "healthy" ]; do sleep 2; done'
+          timeout 120 bash -c 'until [ "$(docker inspect --format=\"{{.State.Health.Status}}\" test-functional)" == "healthy" ]; do echo "Current status: $(docker inspect --format=\"{{.State.Health.Status}}\" test-functional 2>/dev/null || echo unknown)"; sleep 5; done'
+          
+          echo "✅ Container is ready for testing"
 
       - name: 🔍 Test Container Status
         run: |
@@ -322,12 +330,18 @@ jobs:
           echo "🚀 Starting container for SSH tests..."
           docker run -d --name test-ssh \
             -p 2298:22 \
+            --health-cmd="/usr/local/bin/health-check.sh" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            --health-start-period=30s \
             ${{ env.CONTAINER_NAME }}:test
           
           # Wait for SSH service to be ready
           echo "⏳ Waiting for SSH service..."
-          timeout 60 bash -c 'until docker exec test-ssh systemctl is-active sshd | grep -q active; do sleep 2; done'
-          sleep 5
+          sleep 20
+          timeout 90 bash -c 'until docker exec test-ssh systemctl is-active sshd | grep -q active; do sleep 3; done'
+          sleep 10
 
       - name: 🔐 Test SSH Configuration
         run: |
@@ -443,10 +457,15 @@ jobs:
         run: |
           echo "🚀 Starting container for security tests..."
           docker run -d --name test-security \
+            --health-cmd="/usr/local/bin/health-check.sh" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            --health-start-period=30s \
             ${{ env.CONTAINER_NAME }}:test
           
           # Wait for container to be ready
-          sleep 10
+          sleep 20
 
       - name: 👤 Test User Security Configuration
         run: |
@@ -605,7 +624,7 @@ jobs:
       - name: 🚀 Start Multi-Container Environment
         run: |
           echo "🚀 Starting multi-container environment..."
-          docker-compose up -d
+          docker compose up -d
           
           # Wait for containers to be ready
           echo "⏳ Waiting for containers to be ready..."
@@ -616,8 +635,8 @@ jobs:
           echo "📊 Testing multi-container deployment..."
           
           # Check if all services are running
-          SERVICES=$(docker-compose ps --services)
-          RUNNING_SERVICES=$(docker-compose ps --filter "status=running" --services)
+          SERVICES=$(docker compose ps --services)
+          RUNNING_SERVICES=$(docker compose ps --filter "status=running" --services)
           
           echo "Expected services: $SERVICES"
           echo "Running services: $RUNNING_SERVICES"
@@ -629,7 +648,7 @@ jobs:
             echo "✅ All services are running"
           else
             echo "❌ Some services are not running"
-            docker-compose ps
+            docker compose ps
             exit 1
           fi
 
@@ -638,14 +657,14 @@ jobs:
           echo "🌐 Testing network connectivity..."
           
           # Test ping between containers
-          if docker-compose exec -T centos9-node1 ping -c 2 centos9-node2; then
+          if docker compose exec -T centos9-node1 ping -c 2 centos9-node2; then
             echo "✅ Node1 can ping Node2"
           else
             echo "❌ Node1 cannot ping Node2"
             exit 1
           fi
           
-          if docker-compose exec -T centos9-node2 ping -c 2 centos9-node1; then
+          if docker compose exec -T centos9-node2 ping -c 2 centos9-node1; then
             echo "✅ Node2 can ping Node1"
           else
             echo "❌ Node2 cannot ping Node1"
@@ -705,14 +724,14 @@ jobs:
           echo "💾 Testing volume persistence..."
           
           # Create test file in node1
-          docker-compose exec -T centos9-node1 bash -c "mkdir -p /home/ansible/test && echo 'persistence-test' > /home/ansible/test/persistence.txt"
+          docker compose exec -T centos9-node1 bash -c "mkdir -p /home/ansible/test && echo 'persistence-test' > /home/ansible/test/persistence.txt"
           
           # Restart the container
-          docker-compose restart centos9-node1
+          docker compose restart centos9-node1
           sleep 15
           
           # Check if file persists
-          if docker-compose exec -T centos9-node1 cat /home/ansible/test/persistence.txt | grep -q "persistence-test"; then
+          if docker compose exec -T centos9-node1 cat /home/ansible/test/persistence.txt | grep -q "persistence-test"; then
             echo "✅ Volume persistence working"
           else
             echo "❌ Volume persistence failed"
@@ -738,7 +757,7 @@ jobs:
         if: always()
         run: |
           echo "🧹 Cleaning up integration tests..."
-          docker-compose down -v --remove-orphans || true
+          docker compose down -v --remove-orphans || true
           docker system prune -f || true
 
   # ===================================
@@ -760,24 +779,7 @@ jobs:
       - name: 🔧 Validate Docker Compose
         run: |
           echo "🔧 Validating Docker Compose configuration..."
-          docker-compose config
-
-      - name: 💻 Validate PowerShell Scripts
-        shell: pwsh
-        run: |
-          echo "💻 Validating PowerShell scripts..."
-          # Install PSScriptAnalyzer
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
-          
-          # Analyze management script
-          $results = Invoke-ScriptAnalyzer -Path manage.ps1 -Severity Warning
-          if ($results) {
-            Write-Host "⚠️ PowerShell analysis found issues:" -ForegroundColor Yellow
-            $results | Format-Table
-            # Don't fail on warnings, just show them
-          } else {
-            Write-Host "✅ PowerShell script analysis passed" -ForegroundColor Green
-          }
+          docker compose config
 
       - name: 📝 Validate Documentation
         run: |
@@ -898,7 +900,8 @@ jobs:
           echo "## 🎯 Sprint 1 Features" >> release_notes.md
           echo "- ✅ CentOS 9 Stream optimized containers" >> release_notes.md
           echo "- ✅ SSH server with ansible user configuration" >> release_notes.md
-          echo "- ✅ PowerShell management scripts" >> release_notes.md
+          echo "- ✅ Native Docker/Docker Compose commands (v1.2.0+)" >> release_notes.md
+          echo "- ✅ Cross-platform support (Windows, Linux, macOS)" >> release_notes.md
           echo "- ✅ Docker Compose orchestration" >> release_notes.md
           echo "- ✅ Complete test automation with 5 test types" >> release_notes.md
           echo "" >> release_notes.md
@@ -918,12 +921,14 @@ jobs:
           echo "\`\`\`bash" >> release_notes.md
           echo "git clone https://github.com/sebastian-alejandro/ansible-docker.git" >> release_notes.md
           echo "cd ansible-docker" >> release_notes.md
-          echo "docker-compose up -d" >> release_notes.md
+          echo "docker compose up -d" >> release_notes.md
+          echo "ssh ansible@localhost -p 2201" >> release_notes.md
           echo "\`\`\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "## 📚 Documentation" >> release_notes.md
           echo "- [README.md](README.md)" >> release_notes.md
           echo "- [Sprint 1 Documentation](docs/sprint1.md)" >> release_notes.md
+          echo "- [Native Docker Commands Guide](docs/comandos-docker-nativos.md)" >> release_notes.md
           echo "- [Contributing Guidelines](CONTRIBUTING.md)" >> release_notes.md
 
       - name: 🎉 Create GitHub Release
