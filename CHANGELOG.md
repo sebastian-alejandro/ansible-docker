@@ -5,6 +5,29 @@ Todas las modificaciones importantes del proyecto serán documentadas en este ar
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-06-26 - Critical Fix: Docker Build Errors 🔧
+
+### 🐛 Corregido
+- **Docker Build Critical Error**
+  - Corregido conflicto con `curl-minimal` vs `curl` en CentOS 9 Stream
+  - Agregado repositorio `epel-release` para paquetes adicionales como `htop`
+  - Removido atributo `version` obsoleto en `docker-compose.yml`
+  - Corregida sintaxis del health check en docker-compose.yml
+  - Resuelve el error "failed to solve: exit code: 1" en GitHub Actions Build Tests
+
+### 🔧 Técnico
+- Separación de instalación de paquetes en capas optimizadas
+- Remoción explícita de `curl-minimal` antes de instalar `curl` completo
+- Validación de compatibilidad con Docker Compose versión 2.x
+- Corrección de formato de health check para compatibilidad
+
+### 🧪 Testing
+- ✅ Construcción local exitosa del contenedor centos9-node1
+- ✅ Validación de todos los paquetes instalados correctamente
+- ✅ Verificación de compatibilidad con docker-compose.yml
+
+---
+
 ## [1.2.0] - 2025-06-26 - Simplification: Native Docker Commands 🐳
 
 ### 🔄 Cambios Importantes
