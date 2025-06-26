@@ -38,7 +38,7 @@ jobs:
           images: ${{ env.CONTAINER_NAME }}
           tags: |
             type=ref,event=branch
-            type=sha,prefix={{branch}}-
+            type=sha,prefix=sha-
             type=raw,value=build-test
 
       - name: 🏗️ Build Container Image
