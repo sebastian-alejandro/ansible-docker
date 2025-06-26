@@ -165,20 +165,34 @@ jobs:
           echo "🚀 Starting container for functional tests..."
           docker run -d --name test-functional \
             -p 2299:22 \
-            --health-cmd="/usr/local/bin/health-check.sh" \
-            --health-interval=10s \
-            --health-timeout=5s \
-            --health-retries=3 \
-            --health-start-period=30s \
+            --privileged \
+            --tmpfs /tmp \
+            --tmpfs /run \
+            --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
             ${{ env.CONTAINER_NAME }}:test
           
-          # Wait for container to be ready and SSH service to start
+          # Wait for container to be ready
           echo "⏳ Waiting for container to start..."
-          sleep 20
+          sleep 15
           
-          # Wait for container to be healthy
-          echo "⏳ Waiting for container to be healthy..."
-          timeout 120 bash -c 'until [ "$(docker inspect --format=\"{{.State.Health.Status}}\" test-functional)" == "healthy" ]; do echo "Current status: $(docker inspect --format=\"{{.State.Health.Status}}\" test-functional 2>/dev/null || echo unknown)"; sleep 5; done'
+          # Debug: Check container logs
+          echo "📋 Container startup logs:"
+          docker logs test-functional
+          
+          # Wait for SSH service to be ready (manual check)
+          echo "⏳ Waiting for SSH service to be ready..."
+          timeout 120 bash -c 'until docker exec test-functional systemctl is-active sshd | grep -q active; do 
+            echo "SSH service status: $(docker exec test-functional systemctl is-active sshd 2>/dev/null || echo failed)"
+            sleep 5
+          done'
+          
+          # Additional wait for port to be ready
+          echo "⏳ Waiting for SSH port to be ready..."
+          timeout 60 bash -c 'until docker exec test-functional netstat -tuln | grep -q ":22 "; do 
+            echo "Checking SSH port..."
+            sleep 3
+          done'
           
           echo "✅ Container is ready for testing"
 
@@ -330,11 +344,11 @@ jobs:
           echo "🚀 Starting container for SSH tests..."
           docker run -d --name test-ssh \
             -p 2298:22 \
-            --health-cmd="/usr/local/bin/health-check.sh" \
-            --health-interval=10s \
-            --health-timeout=5s \
-            --health-retries=3 \
-            --health-start-period=30s \
+            --privileged \
+            --tmpfs /tmp \
+            --tmpfs /run \
+            --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
             ${{ env.CONTAINER_NAME }}:test
           
           # Wait for SSH service to be ready
@@ -457,11 +471,11 @@ jobs:
         run: |
           echo "🚀 Starting container for security tests..."
           docker run -d --name test-security \
-            --health-cmd="/usr/local/bin/health-check.sh" \
-            --health-interval=10s \
-            --health-timeout=5s \
-            --health-retries=3 \
-            --health-start-period=30s \
+            --privileged \
+            --tmpfs /tmp \
+            --tmpfs /run \
+            --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
             ${{ env.CONTAINER_NAME }}:test
           
           # Wait for container to be ready
