@@ -19,7 +19,8 @@ ENV ANSIBLE_USER_HOME=/home/ansible
 
 # Actualizar sistema e instalar paquetes esenciales
 RUN dnf -y update && \
-    dnf -y install \
+    dnf -y install epel-release && \
+    dnf -y install --allowerasing \
         openssh-server \
         openssh-clients \
         sudo \
@@ -40,7 +41,6 @@ RUN dnf -y update && \
         which \
         passwd \
         cronie \
-        logrotate \
         systemd \
         iproute && \
     dnf clean all
