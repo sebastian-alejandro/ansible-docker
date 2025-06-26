@@ -5,6 +5,22 @@ Todas las modificaciones importantes del proyecto serán documentadas en este ar
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-06-26 - Hotfix: Docker Tag Format 🔧
+
+### 🐛 Corregido
+- **Docker Build Error en GitHub Actions**
+  - Corregido formato inválido de tag `centos9-ansible:-919c6b3` en workflows
+  - Cambio de `type=sha,prefix={{branch}}-` a `type=sha,prefix=sha-` en metadata action
+  - Aplicado a workflows `ci-cd.yml` y `build-tests.yml`
+  - Resuelve error "ERROR: invalid reference format" en Build Tests job
+
+### 🔧 Técnico
+- Corrección en configuración de docker/metadata-action@v5
+- Validación de formato de tags Docker en CI/CD pipeline
+- Prevención de fallos en construcción de imágenes
+
+---
+
 ## [1.1.0] - 2025-06-26 - Sprint 1 Enhanced: Complete Test Automation 🧪
 
 ### ✅ Agregado
