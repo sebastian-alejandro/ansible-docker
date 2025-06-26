@@ -1,0 +1,128 @@
+---
+# Playbook para configurar servidores web
+- name: Configuración de Servidores Web
+  hosts: webservers
+  become: true
+  gather_facts: true
+  vars:
+    web_packages:
+      - httpd
+      - mod_ssl
+    web_port: 80
+    web_ssl_port: 443
+
+  tasks:
+    - name: Mostrar hosts objetivo
+      ansible.builtin.debug:
+        msg: "🌐 Configurando servidor web en {{ inventory_hostname }}"
+
+    - name: Instalar paquetes de servidor web
+      ansible.builtin.dnf:
+        name: "{{ web_packages }}"
+        state: present
+
+    - name: Crear directorio de contenido web
+      ansible.builtin.file:
+        path: /var/www/html
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+
+    - name: Crear página web de demostración
+      ansible.builtin.template:
+        dest: /var/www/html/index.html
+        owner: apache
+        group: apache
+        mode: '0644'
+        content: |
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Laboratorio Ansible - {{ inventory_hostname }}</title>
+              <style>
+                  body { 
+                      font-family: Arial, sans-serif; 
+                      margin: 40px; 
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                  }
+                  .container { 
+                      max-width: 800px; 
+                      margin: 0 auto; 
+                      background: rgba(255,255,255,0.1);
+                      padding: 30px;
+                      border-radius: 10px;
+                      backdrop-filter: blur(10px);
+                  }
+                  h1 { color: #ffeb3b; text-align: center; }
+                  .info { background: rgba(255,255,255,0.2); padding: 15px; margin: 10px 0; border-radius: 5px; }
+                  .status { color: #4caf50; font-weight: bold; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🚀 Laboratorio Ansible</h1>
+                  <div class="info">
+                      <h2>📊 Información del Servidor</h2>
+                      <p><strong>Hostname:</strong> {{ inventory_hostname }}</p>
+                      <p><strong>IP Address:</strong> {{ ansible_default_ipv4.address }}</p>
+                      <p><strong>Sistema:</strong> {{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+                      <p><strong>Grupo:</strong> {{ group_names | join(', ') }}</p>
+                      <p><strong>Rol:</strong> {{ host_role | default('Web Server') }}</p>
+                  </div>
+                  <div class="info">
+                      <h2>✅ Estado del Servicio</h2>
+                      <p class="status">🌐 Apache HTTP Server - ACTIVO</p>
+                      <p class="status">🔧 Configurado por Ansible</p>
+                      <p><strong>Fecha de configuración:</strong> {{ ansible_date_time.iso8601 }}</p>
+                  </div>
+                  <div class="info">
+                      <h2>🔗 Enlaces del Laboratorio</h2>
+                      <p>🏠 <a href="/" style="color: #ffeb3b;">Página Principal</a></p>
+                      <p>📋 <a href="/server-status" style="color: #ffeb3b;">Estado del Servidor</a></p>
+                  </div>
+              </div>
+          </body>
+          </html>
+
+    - name: Configurar firewall para HTTP
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        state: enabled
+        immediate: true
+      ignore_errors: true
+
+    - name: Configurar firewall para HTTPS
+      ansible.posix.firewalld:
+        service: https
+        permanent: true
+        state: enabled
+        immediate: true
+      ignore_errors: true
+
+    - name: Iniciar y habilitar Apache
+      ansible.builtin.systemd:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Verificar que Apache esté ejecutándose
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}"
+        method: GET
+        status_code: 200
+      register: web_check
+      retries: 3
+      delay: 5
+
+    - name: Mostrar resultado de la configuración
+      ansible.builtin.debug:
+        msg: |
+          ✅ Servidor web configurado exitosamente
+          🌐 URL: http://{{ ansible_default_ipv4.address }}
+          📊 Estado: {{ 'ACTIVO' if web_check.status == 200 else 'ERROR' }}
+      when: web_check is defined

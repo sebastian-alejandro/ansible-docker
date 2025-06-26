@@ -1,465 +1,320 @@
-# 🐳 Ansible Docker Environment
+# 🐳 Ansible Docker Environment - Plataforma Evolutiva
 
 [![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://www.docker.com/)
 [![CentOS](https://img.shields.io/badge/CentOS-9%20Stream-red.svg)](https://www.centos.org/)
-[![Ansible](https://img.shields.io/badge/Ansible-Ready-green.svg)](https://www.ansible.com/)
+[![Rocky](https://img.shields.io/badge/Rocky-9-blue.svg)](https://rockylinux.org/)
+[![Ansible](https://img.shields.io/badge/Ansible-Core-green.svg)](https://www.ansible.com/)
 [![Version](https://img.shields.io/badge/Version-1.2.0-success.svg)](https://github.com/sebastian-alejandro/ansible-docker/releases)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-brightgreen.svg)](https://github.com/sebastian-alejandro/ansible-docker/actions)
+[![Sprint](https://img.shields.io/badge/Sprint-1%2F5%20Completado-orange.svg)](docs/project-vision.md)
 
 ## 🎯 Descripción
 
-Ambiente completo de **Ansible** utilizando **Docker containers** para desarrollo, testing y automatización. Incluye:
+**Plataforma evolutiva de automatización Ansible** que transforma desde un laboratorio básico hasta una **solución empresarial de clase mundial**. Proyecto estructurado en **5 sprints** con metodología ágil, cada uno construyendo sobre el anterior.
 
-- **CentOS 9 Stream** como **Managed Nodes** escalables
-- **Ansible Control Node** para gestión centralizada (Sprint 2)
-- **CI/CD Pipeline completo** con GitHub Actions
-- **5 tipos de pruebas automatizadas** (Build, Functional, SSH, Security, Integration)
-- **Comandos nativos Docker/Docker Compose** para gestión multiplataforma
-- Documentación completa y troubleshooting
+### 🚀 Visión del Proyecto
 
-## 🏗️ Arquitectura
+> **Transformar la automatización de infraestructura** desde fundamentos sólidos hasta excelencia operacional con observabilidad completa, self-healing y optimización predictiva.
+
+**Estado Actual**: ✅ **Sprint 1 COMPLETADO** - Base sólida establecida  
+**Próximo Hito**: 📅 **Sprint 2** - Control Node y automatización SSH
+
+### ✨ Evolución por Sprints
+
+| Sprint | Fase | Estado | Valor de Negocio |
+|--------|------|--------|------------------|
+| 🏗️ **Sprint 1** | Fundamentos | ✅ **Completado** | Base confiable |
+| 🎛️ **Sprint 2** | Control & Automatización | 📅 **Planificado** | Reducir errores 90% |
+| 🌐 **Sprint 3** | Orquestación Avanzada | 📅 **Planificado** | Escalabilidad empresarial |
+| 🏢 **Sprint 4** | Nivel Empresarial | 📅 **Planificado** | Reducir costos 40% |
+| 📊 **Sprint 5** | Excelencia Operacional | 📅 **Planificado** | 99.9% uptime, ML-powered |
+
+## 🏗️ Arquitectura Sprint 2
 
 ```
-┌─────────────────┐    SSH/Ansible    ┌─────────────────┐
-│   Ansible       │ ──────────────────► │   CentOS 9      │
-│   Control Node  │                    │   Container 1   │
-│   (Container)   │ ──────────────────► │   Container 2   │
-└─────────────────┘                    │   Container N   │
-                                       └─────────────────┘
+┌─────────────────────────┐
+│   Ansible Control Node │
+│   (Rocky Linux 9)       │  SSH Passwordless
+│   Port: 2200           │ ◄────────────────┐
+└─────────────────────────┘                  │
+            │                                │
+            │ Ansible Automation             │
+            ▼                                │
+┌─────────────────────────┐                  │
+│     Managed Nodes       │                  │
+│                         │                  │
+│  ┌─────────────────┐   │                  │
+│  │ centos9-node-1  │   │ ◄────────────────┤
+│  │ Port: 2201      │   │                  │
+│  └─────────────────┘   │                  │
+│  ┌─────────────────┐   │                  │
+│  │ centos9-node-2  │   │ ◄────────────────┤
+│  │ Port: 2202      │   │                  │
+│  └─────────────────┘   │                  │
+│  ┌─────────────────┐   │                  │
+│  │ centos9-node-3  │   │ ◄────────────────┘
+│  │ Port: 2203      │   │
+│  └─────────────────┘   │
+└─────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## 🚀 Quick Start Sprint 2
 
 ### 1. Prerrequisitos
 - Docker Desktop (Windows/Linux/macOS)
 - Docker Compose v2.0+
-- Git (opcional)
+- Git (para clonación del repositorio)
 
-### 2. Instalación Rápida
+### 2. Instalación y Configuración
 
 ```bash
-# Clonar o descargar el proyecto
-cd ansible_docker
+# Clonar repositorio
+git clone https://github.com/sebastian-alejandro/ansible-docker.git
+cd ansible-docker
 
-# Construir imágenes
-docker compose build
+# Usar script de gestión (recomendado)
+chmod +x manage-sprint2.sh
+./manage-sprint2.sh start
 
-# Iniciar containers
-docker compose up -d
-
-# Verificar estado
-docker compose ps
-docker compose logs
+# O usar Docker Compose directamente
+docker compose up -d --build
 ```
 
-### 3. Conectarse a los Containers
+### 3. Acceso al Nodo de Control
 
 ```bash
-# SSH desde cualquier OS
-ssh ansible@localhost -p 2201  # Node 1
-ssh ansible@localhost -p 2202  # Node 2
+# Método 1: Script de gestión
+./manage-sprint2.sh shell
 
-# O directamente al container
-docker exec -it centos9-node1 bash
-docker exec -it centos9-node2 bash
+# Método 2: Docker Compose directo
+docker compose exec ansible-control bash
+```
+### 4. Verificar Conectividad y Estado
+
+```bash
+# Verificar estado del laboratorio
+./manage-sprint2.sh status
+
+# Test de conectividad Ansible
+./manage-sprint2.sh test
+
+# Ver inventario de hosts
+./manage-sprint2.sh inventory
+```
+
+### 5. Ejecutar Playbooks de Demostración
+
+```bash
+# Playbook básico de conectividad
+./manage-sprint2.sh playbook ping.yml
+
+# Configuración base de nodos
+./manage-sprint2.sh playbook setup-base.yml
+
+# Configuración de webservers
+./manage-sprint2.sh playbook setup-webservers.yml
+```
+
+## 🎛️ Script de Gestión Sprint 2
+
+El script `manage-sprint2.sh` proporciona comandos simplificados para gestionar el laboratorio:
+
+```bash
+# Comandos principales
+./manage-sprint2.sh start        # Iniciar laboratorio completo
+./manage-sprint2.sh stop         # Detener laboratorio
+./manage-sprint2.sh restart      # Reiniciar laboratorio
+./manage-sprint2.sh status       # Verificar estado
+
+# Gestión de Ansible
+./manage-sprint2.sh shell        # Acceso al control node
+./manage-sprint2.sh test         # Test de conectividad
+./manage-sprint2.sh playbook     # Ejecutar playbooks
+./manage-sprint2.sh inventory    # Ver inventario
+./manage-sprint2.sh keys         # Redistribuir claves SSH
+
+# Mantenimiento
+./manage-sprint2.sh logs         # Ver logs
+./manage-sprint2.sh build        # Reconstruir imágenes
+./manage-sprint2.sh backup       # Backup de datos
+./manage-sprint2.sh cleanup      # Limpiar todo
+```
+
+## 🔐 Acceso SSH
+
+### Desde el Nodo de Control (automático)
+```bash
+# Dentro del nodo de control
+ansible all -m ping                    # Test todos los nodos
+ssh ansible@centos9-node-1            # SSH directo a nodo
+ssh ansible@centos9-node-2            # SSH directo a nodo
+ssh ansible@centos9-node-3            # SSH directo a nodo
+```
+
+### Desde Host Externo
+```bash
+# SSH directo desde el host
+ssh ansible@localhost -p 2200  # Control Node
+ssh ansible@localhost -p 2201  # Node 1  
+ssh ansible@localhost -p 2202  # Node 2
+ssh ansible@localhost -p 2203  # Node 3
+
+# Contraseña por defecto: ansible123
+```
+
+### Acceso Docker Directo
+```bash
+# Ejecutar bash directamente
+docker compose exec ansible-control bash
+docker compose exec centos9-node-1 bash
+docker compose exec centos9-node-2 bash
+docker compose exec centos9-node-3 bash
 ```
 
 ## 📚 Documentación por Sprints
 
-### Sprint 1: ✅ Completado (v1.2.0)
+## 📚 Documentación por Sprints
+
+> 📖 **[Visión Completa del Proyecto](docs/project-vision.md)** - Arquitectura evolutiva y roadmap detallado
+
+### Sprint 1: ✅ Completado (v1.2.0) - **ACTUAL**
 - [📖 Sprint 1 - Fundamentos y CentOS 9](docs/sprint1.md)
-- Container CentOS 9 optimizado
-- **Comandos nativos Docker/Docker Compose** para gestión multiplataforma
-- Docker Compose base con health checks
-- **CI/CD Pipeline completo con GitHub Actions**
-- **5 tipos de pruebas automatizadas**
-- **Testing automatizado en GitHub Actions**
+- ✅ Container CentOS 9 optimizado
+- ✅ **Comandos nativos Docker/Docker Compose** para gestión multiplataforma
+- ✅ Docker Compose base con health checks
+- ✅ **CI/CD Pipeline completo con GitHub Actions**
+- ✅ **5 tipos de pruebas automatizadas**
+- ✅ **Testing automatizado en GitHub Actions**
 
-### Sprint 2: 🚧 En Desarrollo
-- [ ] Ansible Control Node
-- [ ] SSH keys automáticas
-- [ ] Inventario dinámico
-- [ ] Playbooks de conectividad
+### Sprint 2: 📅 Planificado (v2.0.0)
+- [📖 Sprint 2 - Control Node y Automatización SSH](docs/sprint2.md)
+- 🔄 Ansible Control Node (Rocky Linux 9)
+- 🔄 SSH keys automáticas y distribución
+- 🔄 Inventario dinámico con grupos
+- 🔄 Playbooks de demostración
+- 🔄 Script de gestión avanzado
 
-### Sprint 3-5: 📅 Planificado
-- [ ] Orquestación avanzada
-- [ ] Escalado automático
-- [ ] Playbooks de administración
-- [ ] Monitoreo y logging
+### Sprint 3: 📅 Planificado (v3.0.0)
+- [📖 Sprint 3 - Orquestación Avanzada](docs/sprint3.md)
+- 🔄 Múltiples entornos (dev/staging/prod)
+- 🔄 Ansible Vault para gestión de secretos
+- 🔄 Roles y collections empresariales
+- 🔄 Pipeline CI/CD avanzado con Molecule
+- 🔄 AWX/Tower para orquestación
 
-## 🛠️ Comandos Docker Nativos
+### Sprint 4: 📅 Planificado (v4.0.0)
+- [📖 Sprint 4 - Automatización Empresarial](docs/sprint4.md)
+- 🔄 Playbooks de administración avanzada
+- 🔄 Integración con sistemas externos (LDAP, ServiceNow)
+- 🔄 Reporting y auditoría empresarial
+- 🔄 Escalado automático multi-cloud
+- 🔄 Governance y compliance automático
 
-### Gestión Básica
+### Sprint 5: 📅 Planificado (v5.0.0)
+- [📖 Sprint 5 - Excelencia Operacional](docs/sprint5.md)
+- 🔄 Observabilidad 360° (Prometheus, Grafana, ELK)
+- 🔄 Machine Learning para optimización predictiva
+- 🔄 Self-healing y auto-remediation
+- 🔄 FinOps y cost optimization avanzado
+- 🔄 Capacidades de IA y predictive analytics
+
+### 🔗 Enlaces de Navegación Rápida
+- 📊 **[Visión del Proyecto](docs/project-vision.md)** - Arquitectura evolutiva completa y roadmap
+- 🏗️ **[Sprint Actual - Sprint 1](docs/sprint1.md)** - Detalles del sprint completado
+- 🎛️ **[Próximo Sprint - Sprint 2](docs/sprint2.md)** - Control Node y automatización SSH
+- 📈 **[Roadmap Completo](docs/project-vision.md#-roadmap-temporal)** - Timeline y métricas de progreso
+- 🎯 **[Criterios de Éxito](docs/project-vision.md#-criterios-de-éxito-del-proyecto)** - KPIs y objetivos del proyecto
+- 🔄 **[Metodología Ágil](docs/project-vision.md#-flujo-de-desarrollo-ágil)** - Proceso de desarrollo por sprints
+
+## �️ Comandos de Gestión
+
+### Sprint 1 (Actual)
 ```bash
-# Construir imágenes
-docker compose build
-
-# Iniciar todos los containers
+# Gestión básica con Docker Compose
 docker compose up -d
-
-# Detener containers
+docker compose ps
+docker compose logs
 docker compose down
 
-# Ver estado de containers
-docker compose ps
-
-# Ver logs de todos los containers
-docker compose logs
-
-# Ver logs de un container específico
-docker compose logs centos9-node1
+# SSH a containers
+ssh ansible@localhost -p 2201  # Node 1
+ssh ansible@localhost -p 2202  # Node 2
 ```
 
-### Gestión Individual de Containers
+### Sprint 2 (Próximo)
 ```bash
-# Iniciar un container específico
-docker compose up -d centos9-node1
-
-# Detener un container específico
-docker compose stop centos9-node1
-
-# Reiniciar un container
-docker compose restart centos9-node1
-
-# Conectarse a un container
-docker exec -it centos9-node1 bash
-
-# Ejecutar comandos en un container
-docker exec centos9-node1 systemctl status sshd
+# Script de gestión avanzado
+./manage-sprint2.sh start       # Iniciar laboratorio
+./manage-sprint2.sh shell       # Acceso al control node
+./manage-sprint2.sh test        # Test conectividad Ansible
+./manage-sprint2.sh playbook    # Ejecutar playbooks
 ```
 
-### Testing y Verificación
-```bash
-# Verificar conectividad SSH (requiere cliente SSH)
-ssh ansible@localhost -p 2201
-ssh ansible@localhost -p 2202
+## � Métricas de Progreso
 
-# Test de health check
-docker compose exec centos9-node1 /usr/local/bin/health-check.sh
-
-# Verificar servicios en containers
-docker exec centos9-node1 systemctl status sshd
-docker exec centos9-node2 systemctl status sshd
-
-# Verificar usuarios y permisos
-docker exec centos9-node1 id ansible
-docker exec centos9-node1 sudo -u ansible sudo -n whoami
-```
-
-### Scaling y Gestión Avanzada
-```bash
-# Escalar número de containers
-docker compose up -d --scale centos9-node1=3
-
-# Rebuild forzado de imágenes
-docker compose build --no-cache
-
-# Limpiar volúmenes y recrear ambiente
-docker compose down -v
-docker compose up -d
-
-# Ver uso de recursos
-docker stats
-
-# Ver redes creadas
-docker network ls
-docker network inspect ansible_ansible-network
-```
-
-## 🔧 Configuración
-
-### Acceso SSH por Defecto
-
-| Container | Puerto | Usuario | Password |
-|-----------|--------|---------|----------|
-| centos9-node1 | 2201 | ansible | ansible123 |
-| centos9-node2 | 2202 | ansible | ansible123 |
-| centos9-node1 | 2201 | root | rootpass123 |
-| centos9-node2 | 2202 | root | rootpass123 |
-
-### Variables de Entorno
-
-```yaml
-# En docker-compose.yml
-environment:
-  - TZ=America/Mexico_City      # Timezone
-  - HOSTNAME=centos9-node1      # Hostname del container
-```
-
-## 📁 Estructura del Proyecto
-
-```
-ansible_docker/
-├── 📁 centos9/                 # Container CentOS 9
-│   ├── 🐳 Dockerfile          # Imagen base
-│   └── 📁 scripts/            # Scripts de inicialización
-│       ├── init.sh           # Inicialización
-│       └── health-check.sh   # Health check
-├── 📁 ansible-control/        # Container Ansible (Sprint 2)
-├── 📁 docs/                   # Documentación completa
-│   └── sprint1.md            # Documentación Sprint 1
-├── � .github/workflows/      # CI/CD GitHub Actions
-│   ├── ci-cd.yml             # Pipeline principal
-│   ├── build-tests.yml       # Tests de construcción
-│   ├── security-tests.yml    # Tests de seguridad
-│   └── integration-tests.yml # Tests de integración
-├── 🐳 docker-compose.yml      # Orquestación
-└── 📖 README.md               # Este archivo
-```
-
-## 🔍 Testing y Verificación
-
-### Health Checks Automáticos
-Los containers incluyen verificaciones automáticas:
-- ✅ SSH service activo
-- ✅ Puerto 22 escuchando
-- ✅ Usuario ansible configurado
-- ✅ Python3 disponible
-- ✅ Permisos sudo correctos
-
-### Tests Manuales
-```bash
-# Test básico de conectividad
-ssh ansible@localhost -p 2201
-ssh ansible@localhost -p 2202
-
-# Verificar health check interno
-docker exec centos9-node1 /usr/local/bin/health-check.sh
-
-# Tests de servicios
-docker exec centos9-node1 systemctl status sshd
-docker exec centos9-node1 python3 --version
-```
-
-### CI/CD Testing Automático
-El proyecto incluye testing automático via GitHub Actions:
-- **Build Tests**: Construcción de imágenes y validación
-- **Functional Tests**: Servicios y funcionalidad básica
-- **SSH Tests**: Conectividad y autenticación SSH
-- **Security Tests**: Configuración de seguridad
-- **Integration Tests**: Tests multi-container
-
-## 🐛 Troubleshooting
-
-### Problemas Comunes
-
-**Container no inicia:**
-```bash
-# Ver logs detallados
-docker compose logs centos9-node1
-
-# Verificar estado de containers
-docker compose ps
-
-# Rebuild si es necesario
-docker compose build --no-cache centos9-node1
-```
-
-**Error de conexión SSH:**
-```bash
-# Verificar que el container esté running
-docker compose ps
-
-# Verificar que SSH esté activo
-docker exec centos9-node1 systemctl status sshd
-
-# Test de conectividad
-ssh ansible@localhost -p 2201
-```
-
-**Limpiar ambiente completamente:**
-```bash
-# Detener y eliminar todo
-docker compose down -v
-
-# Limpiar imágenes (opcional)
-docker image prune -f
-
-# Rebuild completo
-docker compose build --no-cache
-docker compose up -d
-```
-
-**Problemas de permisos o configuración:**
-```bash
-# Verificar configuración del usuario ansible
-docker exec centos9-node1 id ansible
-docker exec centos9-node1 groups ansible
-
-# Verificar configuración SSH
-docker exec centos9-node1 sshd -T
-
-# Verificar health check
-docker exec centos9-node1 /usr/local/bin/health-check.sh
-```
+| Sprint | Estado | Progreso | Valor de Negocio |
+|--------|--------|----------|------------------|
+| 🏗️ **Sprint 1** | ✅ **Completado** | 100% | Base confiable establecida |
+| 🎛️ **Sprint 2** | 📅 **Planificado** | 0% | Reducir errores manuales 90% |
+| 🌐 **Sprint 3** | 📅 **Futuro** | 0% | Escalabilidad empresarial |
+| 🏢 **Sprint 4** | 📅 **Futuro** | 0% | Reducir costos infraestructura 40% |
+| 📊 **Sprint 5** | 📅 **Futuro** | 0% | Excelencia operacional 99.9% |
 
 ## 🤝 Contribución
 
-### Desarrollo Local
-```bash
-# Fork del repositorio
-git clone https://github.com/your-username/ansible-docker.git
-cd ansible-docker
+### 🌟 Cómo Contribuir
 
-# Crear rama de desarrollo
-git checkout -b feature/nueva-funcionalidad
+1. **Fork** el repositorio
+2. **Clone** tu fork localmente
+3. **Crea** una branch para tu feature: `git checkout -b feature/amazing-feature`
+4. **Commit** tus cambios: `git commit -m 'Add amazing feature'`
+5. **Push** a tu branch: `git push origin feature/amazing-feature`
+6. **Abre** un Pull Request
 
-# Realizar cambios y testing
-docker compose build
-docker compose up -d
-docker compose exec centos9-node1 bash
+### 📋 Guidelines
 
-# Commit y push
-git add .
-git commit -m "feat: descripción del cambio"
-git push origin feature/nueva-funcionalidad
+- Seguir el estilo de código existente
+- Incluir tests para nuevas funcionalidades
+- Actualizar documentación cuando sea necesario
+- Usar conventional commits
 
-# Crear Pull Request en GitHub
-```
+### � Reportar Issues
 
-### Testing de Cambios
-```bash
-# Test básico local
-docker compose up -d
-ssh ansible@localhost -p 2201
+- Usar templates de issues
+- Incluir información de entorno
+- Pasos para reproducir el problema
+- Logs relevantes
 
-# Test de health checks
-docker exec centos9-node1 /usr/local/bin/health-check.sh
+## 📜 Licencia
 
-# Verificar que no hay regresiones
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-```
-1. Fork del proyecto
-2. Crear rama de feature
-3. Desarrollar y probar
-4. Pull request con documentación
+Este proyecto está licenciado bajo la **MIT License** - ver el archivo [LICENSE](LICENSE) para detalles.
 
-### Standards
-- Documentación en Markdown
-- Scripts PowerShell comentados
-- Dockerfiles optimizados
-- Tests automatizados
+## 🙏 Agradecimientos
 
-## 📈 Roadmap
-
-### Sprint Actual: 1/5 ✅
-- [x] CentOS 9 base optimizado
-- [x] Scripts de gestión PowerShell
-- [x] Docker Compose funcional
-- [x] Documentación completa
-
-### Próximos Sprints
-- **Sprint 2:** Ansible Control Node
-- **Sprint 3:** Orquestación avanzada
-- **Sprint 4:** Playbooks y automatización
-- **Sprint 5:** Monitoreo y optimización
-
-## 📄 Licencia
-
-Este proyecto está bajo licencia MIT. Ver `LICENSE` para más detalles.
-
-## 👥 Equipo
-
-**DevOps Team**
-- Arquitectura y diseño
-- Implementación Docker
-- Documentación técnica
-- Scripts de automatización
-
----
+- **Red Hat Ansible** por la increíble plataforma de automatización
+- **Docker Community** por containerización sencilla
+- **CentOS/Rocky Linux** por sistemas operativos estables
+- **GitHub Actions** por CI/CD gratuito
+- **Open Source Community** por herramientas y bibliotecas
 
 ## 📞 Soporte
 
-Para soporte técnico:
-1. Revisar [documentación detallada](docs/sprint1.md)
-2. Ejecutar `.\manage.ps1 test` para diagnóstico
-3. Revisar logs con `.\manage.ps1 logs`
-4. Crear [issue en GitHub](https://github.com/sebastian-alejandro/ansible-docker/issues)
+### 🆘 ¿Necesitas Ayuda?
 
-## 🤝 Contribuir
+- 📖 **Documentación**: Revisa la documentación en `/docs`
+- � **Issues**: Reporta problemas en GitHub Issues
+- 💬 **Discusiones**: Únete a las discusiones de la comunidad
+- 📧 **Email**: Contacto directo para soporte empresarial
 
-¡Las contribuciones son bienvenidas! Por favor revisa:
-- [Guía de Contribución](CONTRIBUTING.md)
-- [Código de Conducta](CONTRIBUTING.md#-código-de-conducta)
-- [Templates de Issues](.github/ISSUE_TEMPLATE/)
+### 🔗 Enlaces Útiles
 
-## 📋 Changelog
-
-Ver [CHANGELOG.md](CHANGELOG.md) para detalles de todas las versiones y cambios.
-
-## 📄 Licencia
-
-Este proyecto está bajo [Licencia MIT](LICENSE). Ver el archivo LICENSE para más detalles.
+- [📖 Documentación Completa](docs/)
+- [🐛 Reportar Issue](https://github.com/tu-usuario/ansible-docker/issues)
+- [💬 Discusiones](https://github.com/tu-usuario/ansible-docker/discussions)
+- [� Roadmap](docs/project-vision.md)
 
 ---
 
-**Estado del Proyecto:** 🟢 Sprint 1 Completado  
-**Versión Actual:** v1.0.1  
-**Repositorio:** https://github.com/sebastian-alejandro/ansible-docker  
-**Última Actualización:** Junio 2025
+⭐ **Si este proyecto te ayuda, dale una estrella en GitHub!** ⭐
 
-## 🧪 Testing Automatizado (v1.1.0+)
-
-### 🏗️ CI/CD Pipeline Completo
-Este proyecto incluye un pipeline de CI/CD completo con **GitHub Actions** que ejecuta automáticamente 5 tipos de pruebas en cada commit y pull request:
-
-[![CI/CD Tests](https://github.com/sebastian-alejandro/ansible-docker/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/sebastian-alejandro/ansible-docker/actions/workflows/ci-cd.yml)
-
-### 📋 5 Tipos de Pruebas Automatizadas
-
-#### 1. 🔨 **Build Tests**
-- Construcción de imágenes Docker sin errores
-- Validación de metadatos del container
-- Verificación de variables de entorno
-- Análisis de tamaño de imagen
-
-#### 2. ⚡ **Functional Tests**
-- Verificación de status del container
-- Tests de servicio SSH (activo y escuchando)
-- Validación de configuración de usuarios
-- Tests de Python y herramientas esenciales
-
-#### 3. 🔐 **SSH Connectivity Tests**
-- Configuración del daemon SSH
-- Autenticación por contraseña y clave pública
-- Pruebas de host keys SSH
-- Tests de conexión SSH reales
-
-#### 4. 🔒 **Security Tests**
-- Configuración de usuarios y grupos
-- Validación de configuración sudo
-- Verificación de permisos de archivos críticos
-- Tests de servicios innecesarios
-
-#### 5. 🔗 **Integration Tests**
-- Despliegue multi-container con Docker Compose
-- Tests de conectividad entre containers
-- Verificación de mapeo de puertos
-- Tests de health checks y persistencia
-
-### 🎮 Ejecución de Tests
-
-#### Tests Locales
-```powershell
-.\manage.ps1 test-full          # Suite completa
-.\manage.ps1 test-build         # Solo build
-.\manage.ps1 test-security      # Solo seguridad
-```
-
-#### Tests Remotos (GitHub Actions)
-```powershell
-.\manage.ps1 test-remote all                    # Ejecutar pipeline completo
-.\manage.ps1 test-remote-security enhanced      # Tests de seguridad avanzados
-.\manage.ps1 workflow-status                    # Ver estado actual
-```
-
-### 📊 Workflows Disponibles
-- **Complete Test Suite**: Pipeline principal con todos los tests
-- **Build Tests Only**: Solo pruebas de construcción
-- **Security Tests Only**: Pruebas específicas de seguridad
-- **Integration Tests Only**: Tests multi-container
-- **Custom Test Runner**: Ejecutor personalizable
-
----
+*Hecho con ❤️ para la comunidad DevOps y Ansible*

@@ -1,0 +1,77 @@
+---
+# Playbook para configurar paquetes base en todos los hosts
+- name: Configuración Base del Laboratorio
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    lab_packages:
+      - vim
+      - curl
+      - wget
+      - git
+      - htop
+      - net-tools
+      - tree
+      - unzip
+
+  tasks:
+    - name: Mostrar información del host
+      ansible.builtin.debug:
+        msg: |
+          🎯 Configurando: {{ inventory_hostname }}
+          🏠 IP: {{ ansible_default_ipv4.address }}
+          💿 SO: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+    - name: Actualizar caché de paquetes
+      ansible.builtin.dnf:
+        update_cache: true
+      when: ansible_pkg_mgr == "dnf"
+
+    - name: Instalar paquetes base del laboratorio
+      ansible.builtin.dnf:
+        name: "{{ lab_packages }}"
+        state: present
+      when: ansible_pkg_mgr == "dnf"
+
+    - name: Verificar servicios básicos
+      ansible.builtin.service_facts:
+
+    - name: Mostrar estado de SSH
+      ansible.builtin.debug:
+        msg: "🔐 SSH está {{ 'activo' if ansible_facts.services['sshd.service'].state == 'running' else 'inactivo' }}"
+      when: "'sshd.service' in ansible_facts.services"
+
+    - name: Crear directorio de laboratorio
+      ansible.builtin.file:
+        path: /opt/ansible-lab
+        state: directory
+        owner: ansible
+        group: ansible
+        mode: '0755'
+
+    - name: Crear archivo de información del host
+      ansible.builtin.template:
+        dest: /opt/ansible-lab/host-info.txt
+        mode: '0644'
+        content: |
+          Información del Host: {{ inventory_hostname }}
+          =====================================
+          
+          IP Address: {{ ansible_default_ipv4.address }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          CPU Cores: {{ ansible_processor_cores }}
+          Memory: {{ ansible_memtotal_mb }} MB
+          
+          Configurado por Ansible en: {{ ansible_date_time.iso8601 }}
+          Grupo: {{ group_names | join(', ') }}
+          
+          Paquetes instalados:
+          {% for package in lab_packages %}
+          - {{ package }}
+          {% endfor %}
+
+    - name: Verificar configuración completada
+      ansible.builtin.debug:
+        msg: "✅ Configuración base completada para {{ inventory_hostname }}"

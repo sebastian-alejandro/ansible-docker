@@ -1,0 +1,33 @@
+---
+# Playbook básico de ping para verificar conectividad
+- name: Test de Conectividad - Ping a todos los hosts
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping test
+      ansible.builtin.ping:
+      register: ping_result
+
+    - name: Mostrar resultado del ping
+      ansible.builtin.debug:
+        msg: "✅ {{ inventory_hostname }} responde correctamente"
+      when: ping_result is succeeded
+
+    - name: Recopilar facts básicos
+      ansible.builtin.setup:
+        gather_subset:
+          - '!all'
+          - '!facter'
+          - '!ohai'
+          - network
+          - hardware
+      register: host_facts
+
+    - name: Mostrar información del host
+      ansible.builtin.debug:
+        msg: |
+          🖥️ Host: {{ inventory_hostname }}
+          🏠 IP: {{ ansible_default_ipv4.address | default('N/A') }}
+          💾 Memoria: {{ ansible_memtotal_mb | default('N/A') }} MB
+          🔧 CPU: {{ ansible_processor_cores | default('N/A') }} cores
+          💿 SO: {{ ansible_distribution | default('N/A') }} {{ ansible_distribution_version | default('N/A') }}
