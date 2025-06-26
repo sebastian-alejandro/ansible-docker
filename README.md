@@ -4,14 +4,18 @@
 [![CentOS](https://img.shields.io/badge/CentOS-9%20Stream-red.svg)](https://www.centos.org/)
 [![Ansible](https://img.shields.io/badge/Ansible-Ready-green.svg)](https://www.ansible.com/)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://github.com/PowerShell/PowerShell)
+[![Version](https://img.shields.io/badge/Version-1.1.0-success.svg)](https://github.com/sebastian-alejandro/ansible-docker/releases)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-brightgreen.svg)](https://github.com/sebastian-alejandro/ansible-docker/actions)
 
 ## 🎯 Descripción
 
 Ambiente completo de **Ansible** utilizando **Docker containers** para desarrollo, testing y automatización. Incluye:
 
 - **CentOS 9 Stream** como **Managed Nodes** escalables
-- **Ansible Control Node** para gestión centralizada
-- Scripts de automatización y gestión
+- **Ansible Control Node** para gestión centralizada (Sprint 2)
+- **CI/CD Pipeline completo** con GitHub Actions
+- **5 tipos de pruebas automatizadas** (Build, Functional, SSH, Security, Integration)
+- Scripts de automatización y gestión con PowerShell
 - Documentación completa y troubleshooting
 
 ## 🏗️ Arquitectura
@@ -60,12 +64,14 @@ ssh ansible@localhost -p 2202  # Node 2
 
 ## 📚 Documentación por Sprints
 
-### Sprint 1: ✅ Completado
+### Sprint 1: ✅ Completado (v1.1.0)
 - [📖 Sprint 1 - Fundamentos y CentOS 9](docs/sprint1.md)
 - Container CentOS 9 optimizado
-- Scripts de gestión PowerShell
-- Docker Compose base
-- Health checks y logging
+- Scripts de gestión PowerShell mejorados
+- Docker Compose base con health checks
+- **CI/CD Pipeline completo con GitHub Actions**
+- **5 tipos de pruebas automatizadas**
+- **Testing local y remoto integrado**
 
 ### Sprint 2: 🚧 En Desarrollo
 - [ ] Ansible Control Node
@@ -88,10 +94,23 @@ ssh ansible@localhost -p 2202  # Node 2
 .\manage.ps1 stop      # Detener containers
 .\manage.ps1 status    # Ver estado
 
+# Testing Local (v1.1.0+)
+.\manage.ps1 test               # Tests básicos de conectividad
+.\manage.ps1 test-build         # Validar construcción de imagen
+.\manage.ps1 test-security      # Tests básicos de seguridad
+.\manage.ps1 test-full          # Suite completa de tests
+
+# Testing Remoto via GitHub Actions (v1.1.0+)
+.\manage.ps1 test-remote all                    # Ejecutar todos los tests remotos
+.\manage.ps1 test-remote-build                  # Tests de build en CI/CD
+.\manage.ps1 test-remote-security standard      # Tests de seguridad remotos
+.\manage.ps1 test-remote-integration 5 2        # Tests de integración (5min, 2 containers)
+.\manage.ps1 workflow-status                    # Ver estado de workflows
+.\manage.ps1 setup-github                       # Configurar GitHub CLI
+
 # Desarrollo y debug
 .\manage.ps1 logs centos9-node1  # Ver logs
 .\manage.ps1 shell centos9-node1 # Conectarse
-.\manage.ps1 test               # Ejecutar tests
 .\manage.ps1 clean              # Limpiar ambiente
 
 # Ayuda
@@ -247,3 +266,67 @@ Este proyecto está bajo [Licencia MIT](LICENSE). Ver el archivo LICENSE para m�
 **Versión Actual:** v1.0.1  
 **Repositorio:** https://github.com/sebastian-alejandro/ansible-docker  
 **Última Actualización:** Junio 2025
+
+## 🧪 Testing Automatizado (v1.1.0+)
+
+### 🏗️ CI/CD Pipeline Completo
+Este proyecto incluye un pipeline de CI/CD completo con **GitHub Actions** que ejecuta automáticamente 5 tipos de pruebas en cada commit y pull request:
+
+[![CI/CD Tests](https://github.com/sebastian-alejandro/ansible-docker/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/sebastian-alejandro/ansible-docker/actions/workflows/ci-cd.yml)
+
+### 📋 5 Tipos de Pruebas Automatizadas
+
+#### 1. 🔨 **Build Tests**
+- Construcción de imágenes Docker sin errores
+- Validación de metadatos del container
+- Verificación de variables de entorno
+- Análisis de tamaño de imagen
+
+#### 2. ⚡ **Functional Tests**
+- Verificación de status del container
+- Tests de servicio SSH (activo y escuchando)
+- Validación de configuración de usuarios
+- Tests de Python y herramientas esenciales
+
+#### 3. 🔐 **SSH Connectivity Tests**
+- Configuración del daemon SSH
+- Autenticación por contraseña y clave pública
+- Pruebas de host keys SSH
+- Tests de conexión SSH reales
+
+#### 4. 🔒 **Security Tests**
+- Configuración de usuarios y grupos
+- Validación de configuración sudo
+- Verificación de permisos de archivos críticos
+- Tests de servicios innecesarios
+
+#### 5. 🔗 **Integration Tests**
+- Despliegue multi-container con Docker Compose
+- Tests de conectividad entre containers
+- Verificación de mapeo de puertos
+- Tests de health checks y persistencia
+
+### 🎮 Ejecución de Tests
+
+#### Tests Locales
+```powershell
+.\manage.ps1 test-full          # Suite completa
+.\manage.ps1 test-build         # Solo build
+.\manage.ps1 test-security      # Solo seguridad
+```
+
+#### Tests Remotos (GitHub Actions)
+```powershell
+.\manage.ps1 test-remote all                    # Ejecutar pipeline completo
+.\manage.ps1 test-remote-security enhanced      # Tests de seguridad avanzados
+.\manage.ps1 workflow-status                    # Ver estado actual
+```
+
+### 📊 Workflows Disponibles
+- **Complete Test Suite**: Pipeline principal con todos los tests
+- **Build Tests Only**: Solo pruebas de construcción
+- **Security Tests Only**: Pruebas específicas de seguridad
+- **Integration Tests Only**: Tests multi-container
+- **Custom Test Runner**: Ejecutor personalizable
+
+---

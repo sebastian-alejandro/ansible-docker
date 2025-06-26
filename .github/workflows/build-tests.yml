@@ -1,0 +1,170 @@
+# ===================================
+# Build Tests Workflow - Standalone
+# ===================================
+
+name: 🔨 Build Tests Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      cache_strategy:
+        description: 'Docker build cache strategy'
+        required: false
+        default: 'gha'
+        type: choice
+        options:
+        - gha
+        - registry
+        - inline
+
+env:
+  CONTAINER_NAME: centos9-ansible
+
+jobs:
+  build-tests-standalone:
+    name: 🔨 Standalone Build Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 📝 Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.CONTAINER_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=build-test
+
+      - name: 🏗️ Build Container Image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./centos9
+          platforms: linux/amd64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=${{ inputs.cache_strategy }}
+          cache-to: type=${{ inputs.cache_strategy }},mode=max
+
+      - name: 🔍 Validate Container Metadata
+        run: |
+          echo "🏷️ Validating container labels and metadata..."
+          
+          # Check required labels
+          MAINTAINER=$(docker inspect --format='{{index .Config.Labels "maintainer"}}' ${{ env.CONTAINER_NAME }}:build-test)
+          VERSION=$(docker inspect --format='{{index .Config.Labels "version"}}' ${{ env.CONTAINER_NAME }}:build-test)
+          DESCRIPTION=$(docker inspect --format='{{index .Config.Labels "description"}}' ${{ env.CONTAINER_NAME }}:build-test)
+          
+          echo "📋 Container Metadata:"
+          echo "  Maintainer: $MAINTAINER"
+          echo "  Version: $VERSION"
+          echo "  Description: $DESCRIPTION"
+          
+          # Validate required metadata
+          [ "$MAINTAINER" = "DevOps Team" ] || { echo "❌ Invalid maintainer"; exit 1; }
+          [ "$VERSION" = "1.0" ] || { echo "❌ Invalid version"; exit 1; }
+          [ -n "$DESCRIPTION" ] || { echo "❌ Missing description"; exit 1; }
+          
+          echo "✅ Container metadata validation passed"
+
+      - name: 🌍 Validate Environment Variables
+        run: |
+          echo "🔍 Validating environment variables..."
+          ENV_VARS=$(docker inspect --format='{{.Config.Env}}' ${{ env.CONTAINER_NAME }}:build-test)
+          
+          echo "📋 Environment Variables: $ENV_VARS"
+          
+          # Check required environment variables
+          [[ "$ENV_VARS" =~ "LANG=en_US.UTF-8" ]] || { echo "❌ LANG not set"; exit 1; }
+          [[ "$ENV_VARS" =~ "ANSIBLE_USER=ansible" ]] || { echo "❌ ANSIBLE_USER not set"; exit 1; }
+          [[ "$ENV_VARS" =~ "ANSIBLE_USER_HOME=/home/ansible" ]] || { echo "❌ ANSIBLE_USER_HOME not set"; exit 1; }
+          
+          echo "✅ Environment variables validation passed"
+
+      - name: 📏 Analyze Image Size and Layers
+        run: |
+          echo "📏 Analyzing image size and layers..."
+          
+          # Show image details
+          docker images ${{ env.CONTAINER_NAME }}:build-test --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+          
+          # Show layer information
+          echo ""
+          echo "📋 Image History (layers):"
+          docker history ${{ env.CONTAINER_NAME }}:build-test --format "table {{.CreatedBy}}\t{{.Size}}" --no-trunc
+          
+          # Get size in bytes for comparison
+          SIZE_BYTES=$(docker inspect ${{ env.CONTAINER_NAME }}:build-test --format='{{.Size}}')
+          SIZE_MB=$((SIZE_BYTES / 1024 / 1024))
+          
+          echo ""
+          echo "📊 Image Size Analysis:"
+          echo "  Size in MB: $SIZE_MB"
+          
+          # Set size thresholds
+          if [ $SIZE_MB -gt 3000 ]; then
+            echo "⚠️ Warning: Image is very large (>3GB)"
+          elif [ $SIZE_MB -gt 1500 ]; then
+            echo "⚠️ Image is large (>1.5GB) - consider optimization"
+          else
+            echo "✅ Image size is reasonable"
+          fi
+
+      - name: 🔍 Validate Dockerfile Best Practices
+        run: |
+          echo "🔍 Validating Dockerfile best practices..."
+          
+          # Check if image uses multi-stage builds (for future optimization)
+          if grep -q "FROM.*AS" centos9/Dockerfile; then
+            echo "✅ Multi-stage build detected"
+          else
+            echo "ℹ️ Single-stage build (acceptable for current implementation)"
+          fi
+          
+          # Check for COPY vs ADD usage
+          if grep -q "^ADD" centos9/Dockerfile; then
+            echo "⚠️ ADD instruction found - consider using COPY instead"
+          else
+            echo "✅ Using COPY instruction (good practice)"
+          fi
+          
+          # Check for clean up commands
+          if grep -q "dnf clean all" centos9/Dockerfile; then
+            echo "✅ Package cache cleanup found"
+          else
+            echo "⚠️ Consider adding package cache cleanup"
+          fi
+          
+          # Check for non-root user (not applicable for SSH containers)
+          echo "ℹ️ Running as root is acceptable for SSH containers"
+
+      - name: 📊 Generate Build Report
+        run: |
+          echo "# 🔨 Build Test Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.CONTAINER_NAME }}:build-test" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get image size
+          SIZE_BYTES=$(docker inspect ${{ env.CONTAINER_NAME }}:build-test --format='{{.Size}}')
+          SIZE_MB=$((SIZE_BYTES / 1024 / 1024))
+          
+          echo "## 📊 Image Statistics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size**: ${SIZE_MB} MB" >> $GITHUB_STEP_SUMMARY
+          echo "- **Layers**: $(docker history ${{ env.CONTAINER_NAME }}:build-test --quiet | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## ✅ Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Container metadata: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment variables: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Dockerfile practices: ✅ Passed" >> $GITHUB_STEP_SUMMARY

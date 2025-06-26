@@ -1,0 +1,328 @@
+# ===================================
+# Integration Tests Workflow - Standalone
+# ===================================
+
+name: 🔗 Integration Tests Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Test duration in minutes'
+        required: false
+        default: '5'
+        type: choice
+        options:
+        - '2'
+        - '5'
+        - '10'
+        - '15'
+      container_count:
+        description: 'Number of containers to test'
+        required: false
+        default: '2'
+        type: choice
+        options:
+        - '2'
+        - '3'
+        - '4'
+
+env:
+  CONTAINER_NAME: centos9-ansible
+
+jobs:
+  integration-tests-standalone:
+    name: 🔗 Standalone Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build test image
+        run: |
+          echo "🏗️ Building container for integration testing..."
+          docker build -t ${{ env.CONTAINER_NAME }}:integration-test ./centos9/
+
+      - name: 🏷️ Tag images for docker-compose
+        run: |
+          echo "🏷️ Tagging images for docker-compose..."
+          # Tag the built image for docker-compose services
+          docker tag ${{ env.CONTAINER_NAME }}:integration-test ansible_docker_centos9-node1:latest
+          docker tag ${{ env.CONTAINER_NAME }}:integration-test ansible_docker_centos9-node2:latest
+          
+          # If testing with more containers
+          if [ "${{ inputs.container_count }}" -gt 2 ]; then
+            docker tag ${{ env.CONTAINER_NAME }}:integration-test ansible_docker_centos9-node3:latest
+          fi
+          if [ "${{ inputs.container_count }}" -gt 3 ]; then
+            docker tag ${{ env.CONTAINER_NAME }}:integration-test ansible_docker_centos9-node4:latest
+          fi
+
+      - name: 📝 Prepare docker-compose for testing
+        run: |
+          echo "📝 Preparing docker-compose configuration..."
+          
+          # Create a test-specific docker-compose file
+          cp docker-compose.yml docker-compose.test.yml
+          
+          # Modify ports to avoid conflicts
+          sed -i 's/2201:22/2301:22/g' docker-compose.test.yml
+          sed -i 's/2202:22/2302:22/g' docker-compose.test.yml
+
+      - name: 🚀 Start Multi-Container Environment
+        run: |
+          echo "🚀 Starting multi-container environment..."
+          
+          # Start with base configuration
+          docker-compose -f docker-compose.test.yml up -d
+          
+          echo "⏳ Waiting for containers to initialize..."
+          sleep 30
+          
+          # Wait for health checks
+          echo "🔍 Checking container health..."
+          for i in {1..30}; do
+            if docker-compose -f docker-compose.test.yml ps | grep -q "Up.*healthy"; then
+              echo "✅ Containers are healthy"
+              break
+            elif [ $i -eq 30 ]; then
+              echo "⚠️ Timeout waiting for healthy containers"
+              docker-compose -f docker-compose.test.yml ps
+              docker-compose -f docker-compose.test.yml logs
+            else
+              echo "⏳ Waiting for health checks... ($i/30)"
+              sleep 10
+            fi
+          done
+
+      - name: 📊 Test Multi-Container Deployment Status
+        run: |
+          echo "📊 Testing multi-container deployment status..."
+          
+          # Check running services
+          echo "🔍 Checking running services:"
+          docker-compose -f docker-compose.test.yml ps
+          
+          # Count running containers
+          RUNNING_COUNT=$(docker-compose -f docker-compose.test.yml ps --filter "status=running" --services | wc -l)
+          EXPECTED_COUNT=2  # Default is 2 containers
+          
+          echo "Running containers: $RUNNING_COUNT"
+          echo "Expected containers: $EXPECTED_COUNT"
+          
+          if [ "$RUNNING_COUNT" -eq "$EXPECTED_COUNT" ]; then
+            echo "✅ All expected containers are running"
+          else
+            echo "❌ Container count mismatch"
+            exit 1
+          fi
+
+      - name: 🌐 Test Network Connectivity Between Containers
+        run: |
+          echo "🌐 Testing network connectivity between containers..."
+          
+          # Test basic network connectivity
+          echo "🔍 Testing ping connectivity:"
+          
+          # Node1 to Node2
+          if docker-compose -f docker-compose.test.yml exec -T centos9-node1 ping -c 3 centos9-node2; then
+            echo "✅ Node1 can ping Node2"
+          else
+            echo "❌ Node1 cannot ping Node2"
+            exit 1
+          fi
+          
+          # Node2 to Node1
+          if docker-compose -f docker-compose.test.yml exec -T centos9-node2 ping -c 3 centos9-node1; then
+            echo "✅ Node2 can ping Node1"
+          else
+            echo "❌ Node2 cannot ping Node1"
+            exit 1
+          fi
+          
+          # Test DNS resolution
+          echo "🔍 Testing DNS resolution:"
+          docker-compose -f docker-compose.test.yml exec -T centos9-node1 nslookup centos9-node2 || echo "⚠️ DNS resolution test (informational)"
+
+      - name: 🔌 Test Port Mapping and Accessibility
+        run: |
+          echo "🔌 Testing port mapping and accessibility..."
+          
+          # Install netcat for port testing
+          sudo apt-get update -qq
+          sudo apt-get install -y netcat-openbsd
+          
+          # Test SSH port accessibility from host
+          PORTS=(2301 2302)
+          for port in "${PORTS[@]}"; do
+            echo "Testing port $port..."
+            if timeout 10 nc -z localhost $port; then
+              echo "✅ Port $port is accessible from host"
+            else
+              echo "❌ Port $port is not accessible from host"
+              # Show port binding information
+              docker port $(docker-compose -f docker-compose.test.yml ps -q centos9-node1) 2>/dev/null || true
+              exit 1
+            fi
+          done
+          
+          # Test internal service connectivity
+          echo "🔍 Testing internal service connectivity:"
+          if docker-compose -f docker-compose.test.yml exec -T centos9-node1 nc -z centos9-node2 22; then
+            echo "✅ Internal SSH connectivity working"
+          else
+            echo "❌ Internal SSH connectivity failed"
+            exit 1
+          fi
+
+      - name: ❤️ Test Container Health and Service Status
+        run: |
+          echo "❤️ Testing container health and service status..."
+          
+          CONTAINERS=("centos9-node1" "centos9-node2")
+          
+          for container in "${CONTAINERS[@]}"; do
+            echo "🔍 Checking $container:"
+            
+            # Health status
+            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $(docker-compose -f docker-compose.test.yml ps -q $container) 2>/dev/null || echo "unknown")
+            echo "  Health status: $HEALTH"
+            
+            # SSH service status
+            SSH_STATUS=$(docker-compose -f docker-compose.test.yml exec -T $container systemctl is-active sshd 2>/dev/null || echo "unknown")
+            echo "  SSH service: $SSH_STATUS"
+            
+            # User ansible check
+            if docker-compose -f docker-compose.test.yml exec -T $container id ansible >/dev/null 2>&1; then
+              echo "  User ansible: ✅ exists"
+            else
+              echo "  User ansible: ❌ missing"
+              exit 1
+            fi
+            
+            # Python availability
+            if docker-compose -f docker-compose.test.yml exec -T $container python3 --version >/dev/null 2>&1; then
+              echo "  Python3: ✅ available"
+            else
+              echo "  Python3: ❌ missing"
+              exit 1
+            fi
+            
+            echo ""
+          done
+
+      - name: 💾 Test Volume Persistence and Data Sharing
+        run: |
+          echo "💾 Testing volume persistence and data sharing..."
+          
+          # Create test data in node1
+          echo "📝 Creating test data..."
+          docker-compose -f docker-compose.test.yml exec -T centos9-node1 bash -c "
+            mkdir -p /home/ansible/integration-test
+            echo 'Integration test data - $(date)' > /home/ansible/integration-test/test-file.txt
+            echo 'Container: centos9-node1' >> /home/ansible/integration-test/test-file.txt
+          "
+          
+          # Restart container to test persistence
+          echo "🔄 Testing persistence across container restart..."
+          docker-compose -f docker-compose.test.yml restart centos9-node1
+          sleep 15
+          
+          # Check if data persists
+          if docker-compose -f docker-compose.test.yml exec -T centos9-node1 cat /home/ansible/integration-test/test-file.txt; then
+            echo "✅ Volume persistence working"
+          else
+            echo "❌ Volume persistence failed"
+            exit 1
+          fi
+
+      - name: 🔍 Test Docker Network Configuration
+        run: |
+          echo "🔍 Testing Docker network configuration..."
+          
+          # Check if ansible-network exists and is properly configured
+          if docker network ls | grep -q ansible-network; then
+            echo "✅ Ansible network exists"
+            
+            # Inspect network configuration
+            echo "📋 Network configuration:"
+            docker network inspect ansible-network --format='{{.IPAM.Config}}'
+            
+            # Check connected containers
+            CONNECTED_CONTAINERS=$(docker network inspect ansible-network --format='{{range $k,$v := .Containers}}{{$v.Name}} {{end}}')
+            echo "Connected containers: $CONNECTED_CONTAINERS"
+            
+          else
+            echo "❌ Ansible network does not exist"
+            exit 1
+          fi
+
+      - name: ⏱️ Long-Running Stability Test
+        run: |
+          echo "⏱️ Running stability test for ${{ inputs.test_duration }} minutes..."
+          
+          DURATION_SECONDS=$(($${{ inputs.test_duration }} * 60))
+          START_TIME=$(date +%s)
+          
+          echo "🔄 Starting stability monitoring..."
+          
+          # Monitor containers for specified duration
+          while [ $(($(date +%s) - START_TIME)) -lt $DURATION_SECONDS ]; do
+            
+            # Check container status
+            RUNNING_COUNT=$(docker-compose -f docker-compose.test.yml ps --filter "status=running" --services | wc -l)
+            if [ "$RUNNING_COUNT" -ne 2 ]; then
+              echo "❌ Container stability test failed - containers stopped running"
+              docker-compose -f docker-compose.test.yml ps
+              exit 1
+            fi
+            
+            # Test connectivity every 30 seconds
+            if docker-compose -f docker-compose.test.yml exec -T centos9-node1 ping -c 1 centos9-node2 >/dev/null 2>&1; then
+              echo "⏳ Stability check passed ($((($(date +%s) - START_TIME) / 60)) min elapsed)"
+            else
+              echo "❌ Network connectivity lost during stability test"
+              exit 1
+            fi
+            
+            sleep 30
+          done
+          
+          echo "✅ Stability test completed successfully"
+
+      - name: 📊 Generate Integration Test Report
+        run: |
+          echo "# 🔗 Integration Test Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Test Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Duration**: ${{ inputs.test_duration }} minutes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Container Count**: ${{ inputs.container_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Network**: ansible-network" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Multi-container deployment: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Network connectivity: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Port mapping: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Health checks: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Volume persistence: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Network configuration: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Stability test: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Environment Details" >> $GITHUB_STEP_SUMMARY
+          
+          # Add container information
+          echo "### Running Containers" >> $GITHUB_STEP_SUMMARY
+          docker-compose -f docker-compose.test.yml ps --format "table" >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Container list not available" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧹 Cleanup Integration Tests
+        if: always()
+        run: |
+          echo "🧹 Cleaning up integration tests..."
+          docker-compose -f docker-compose.test.yml down -v --remove-orphans || true
+          docker rmi ${{ env.CONTAINER_NAME }}:integration-test || true
+          rm -f docker-compose.test.yml
+          docker system prune -f || true

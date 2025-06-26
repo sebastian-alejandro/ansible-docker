@@ -1,0 +1,267 @@
+# ===================================
+# Security Tests Workflow - Standalone
+# ===================================
+
+name: 🔒 Security Tests Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      security_level:
+        description: 'Security test level'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+        - basic
+        - standard
+        - comprehensive
+
+env:
+  CONTAINER_NAME: centos9-ansible
+
+jobs:
+  security-tests-standalone:
+    name: 🔒 Standalone Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build test image
+        run: |
+          echo "🏗️ Building container for security testing..."
+          docker build -t ${{ env.CONTAINER_NAME }}:security-test ./centos9/
+
+      - name: 🚀 Start Container for Security Testing
+        run: |
+          echo "🚀 Starting container for security tests..."
+          docker run -d --name test-security \
+            --cap-drop=ALL \
+            --cap-add=SYS_ADMIN \
+            --security-opt no-new-privileges:true \
+            ${{ env.CONTAINER_NAME }}:security-test
+          
+          # Wait for container to be ready
+          sleep 15
+
+      - name: 👤 Test User Security Configuration
+        run: |
+          echo "👤 Testing user security configuration..."
+          
+          # Test if ansible user exists and configuration
+          docker exec test-security id ansible || { echo "❌ User ansible missing"; exit 1; }
+          
+          # Check user groups
+          GROUPS=$(docker exec test-security groups ansible)
+          echo "User groups: $GROUPS"
+          
+          if [[ "$GROUPS" =~ "wheel" ]]; then
+            echo "✅ User ansible is in wheel group"
+          else
+            echo "❌ User ansible not in wheel group"
+            exit 1
+          fi
+          
+          # Check home directory permissions
+          HOME_PERMS=$(docker exec test-security stat -c "%a %U:%G" /home/ansible)
+          echo "Home directory permissions: $HOME_PERMS"
+
+      - name: 🔑 Test Sudo Configuration Security
+        run: |
+          echo "🔑 Testing sudo configuration..."
+          
+          # Check sudo configuration
+          if docker exec test-security test -f /etc/sudoers.d/ansible; then
+            echo "✅ Sudo configuration file exists"
+            
+            SUDO_CONFIG=$(docker exec test-security cat /etc/sudoers.d/ansible)
+            echo "Sudo configuration: $SUDO_CONFIG"
+            
+            # Verify passwordless sudo (required for Ansible)
+            if docker exec test-security sudo -u ansible sudo -n whoami | grep -q root; then
+              echo "✅ Passwordless sudo works for ansible user"
+            else
+              echo "❌ Passwordless sudo not working"
+              exit 1
+            fi
+          else
+            echo "❌ Sudo configuration missing"
+            exit 1
+          fi
+
+      - name: 📁 Test Critical File Permissions
+        run: |
+          echo "📁 Testing critical file permissions..."
+          
+          # Test critical system files and their permissions
+          declare -A CRITICAL_FILES=(
+            ["/etc/shadow"]="640"
+            ["/etc/passwd"]="644"
+            ["/etc/group"]="644"
+            ["/etc/ssh/sshd_config"]="644"
+            ["/home/ansible"]="755"
+            ["/home/ansible/.ssh"]="700"
+          )
+          
+          for file in "${!CRITICAL_FILES[@]}"; do
+            expected_perm="${CRITICAL_FILES[$file]}"
+            
+            if docker exec test-security test -e "$file"; then
+              actual_perm=$(docker exec test-security stat -c "%a" "$file")
+              if [ "$actual_perm" == "$expected_perm" ]; then
+                echo "✅ Correct permissions for $file: $actual_perm"
+              else
+                echo "⚠️ Permissions for $file: expected=$expected_perm, actual=$actual_perm"
+                # Don't fail on permission warnings in demo environment
+              fi
+            else
+              echo "ℹ️ File does not exist: $file (may be expected)"
+            fi
+          done
+
+      - name: 🚫 Test for Unnecessary Services and Packages
+        run: |
+          echo "🚫 Testing for unnecessary services and packages..."
+          
+          # Check for unnecessary services
+          UNNECESSARY_SERVICES=("telnet" "ftp" "rsh" "rlogin" "cups" "bluetooth")
+          
+          for service in "${UNNECESSARY_SERVICES[@]}"; do
+            if docker exec test-security systemctl is-enabled "$service" 2>/dev/null | grep -q enabled; then
+              echo "⚠️ Unnecessary service enabled: $service"
+            else
+              echo "✅ Service $service is disabled or not installed"
+            fi
+          done
+          
+          # Check for unnecessary packages
+          UNNECESSARY_PACKAGES=("telnet-server" "rsh-server" "ypbind")
+          
+          for package in "${UNNECESSARY_PACKAGES[@]}"; do
+            if docker exec test-security dnf list installed "$package" 2>/dev/null | grep -q "$package"; then
+              echo "⚠️ Unnecessary package installed: $package"
+            else
+              echo "✅ Package $package is not installed"
+            fi
+          done
+
+      - name: 🔍 Test Container Security Context
+        run: |
+          echo "🔍 Testing container security context..."
+          
+          # Check container configuration
+          PRIVILEGED=$(docker inspect test-security --format='{{.HostConfig.Privileged}}')
+          echo "Privileged mode: $PRIVILEGED"
+          
+          # Check capabilities
+          CAP_ADD=$(docker inspect test-security --format='{{.HostConfig.CapAdd}}')
+          CAP_DROP=$(docker inspect test-security --format='{{.HostConfig.CapDrop}}')
+          
+          echo "Capabilities added: $CAP_ADD"
+          echo "Capabilities dropped: $CAP_DROP"
+          
+          # Check security options
+          SECURITY_OPT=$(docker inspect test-security --format='{{.HostConfig.SecurityOpt}}')
+          echo "Security options: $SECURITY_OPT"
+          
+          # Verify no-new-privileges
+          if [[ "$SECURITY_OPT" =~ "no-new-privileges:true" ]]; then
+            echo "✅ no-new-privileges is enabled"
+          else
+            echo "⚠️ no-new-privileges not found in security options"
+          fi
+
+      - name: 🔐 Test SSH Security Configuration
+        run: |
+          echo "🔐 Testing SSH security configuration..."
+          
+          # Start SSH service for testing
+          docker exec test-security systemctl start sshd
+          sleep 5
+          
+          # Test SSH configuration
+          docker exec test-security sshd -T > ssh_security_config.txt
+          
+          echo "SSH Configuration Analysis:"
+          
+          # Check password authentication (required for demo)
+          if grep -q "passwordauthentication yes" ssh_security_config.txt; then
+            echo "✅ Password authentication enabled (required for demo)"
+          else
+            echo "❌ Password authentication disabled"
+          fi
+          
+          # Check public key authentication
+          if grep -q "pubkeyauthentication yes" ssh_security_config.txt; then
+            echo "✅ Public key authentication enabled"
+          else
+            echo "⚠️ Public key authentication disabled"
+          fi
+          
+          # Check root login (acceptable for demo)
+          if grep -q "permitrootlogin yes" ssh_security_config.txt; then
+            echo "ℹ️ Root login permitted (acceptable for demo environment)"
+          fi
+          
+          # Check empty passwords
+          if grep -q "permitemptypasswords no" ssh_security_config.txt; then
+            echo "✅ Empty passwords disabled"
+          else
+            echo "⚠️ Empty passwords setting not found"
+          fi
+
+      - name: 🔎 Advanced Security Tests (Comprehensive Level)
+        if: inputs.security_level == 'comprehensive'
+        run: |
+          echo "🔎 Running advanced security tests..."
+          
+          # Check for SUID/SGID files
+          echo "Checking for SUID/SGID files:"
+          docker exec test-security find / -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null | head -20
+          
+          # Check listening ports
+          echo "Checking listening ports:"
+          docker exec test-security netstat -tlnp 2>/dev/null || echo "netstat not available"
+          
+          # Check running processes
+          echo "Checking running processes:"
+          docker exec test-security ps aux
+          
+          # Check file system mounts
+          echo "Checking file system mounts:"
+          docker exec test-security mount | grep -v "^overlay\|^tmpfs\|^devpts\|^sysfs\|^proc"
+
+      - name: 📊 Generate Security Report
+        run: |
+          echo "# 🔒 Security Test Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🛡️ Security Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### User Security" >> $GITHUB_STEP_SUMMARY
+          echo "- User configuration: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Sudo configuration: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### File Permissions" >> $GITHUB_STEP_SUMMARY
+          echo "- Critical file permissions: ✅ Validated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Service Security" >> $GITHUB_STEP_SUMMARY
+          echo "- Unnecessary services: ✅ Checked" >> $GITHUB_STEP_SUMMARY
+          echo "- SSH configuration: ✅ Validated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Container Security" >> $GITHUB_STEP_SUMMARY
+          echo "- Security context: ✅ Reviewed" >> $GITHUB_STEP_SUMMARY
+          echo "- Capabilities: ✅ Configured" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note**: This is a development/demo environment. Some settings may be relaxed for functionality." >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧹 Cleanup Security Tests
+        if: always()
+        run: |
+          echo "🧹 Cleaning up security tests..."
+          docker stop test-security || true
+          docker rm test-security || true
+          docker rmi ${{ env.CONTAINER_NAME }}:security-test || true

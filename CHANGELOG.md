@@ -5,6 +5,71 @@ Todas las modificaciones importantes del proyecto serán documentadas en este ar
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-06-26 - Sprint 1 Enhanced: Complete Test Automation 🧪
+
+### ✅ Agregado
+- **GitHub Actions CI/CD Pipeline Completo**
+  - Pipeline principal `ci-cd.yml` con 5 tipos de pruebas automatizadas
+  - Workflows independientes para ejecución selectiva de tests
+  - Integración completa con Docker Hub y GitHub Container Registry
+  - Releases automáticos con versionado semántico
+
+- **5 Tipos de Pruebas Automatizadas**
+  - **Build Tests**: Validación de construcción de imágenes, metadatos y variables de entorno
+  - **Functional Tests**: Verificación de servicios, usuarios, Python y estructura de directorios
+  - **SSH Connectivity Tests**: Pruebas completas de conectividad SSH, autenticación y configuración
+  - **Security Tests**: Validación de permisos, usuarios, sudo y contexto de seguridad
+  - **Integration Tests**: Tests multi-container, redes, puertos, health checks y persistencia
+
+- **Workflows GitHub Actions Independientes**
+  - `build-tests.yml` - Tests específicos de construcción
+  - `security-tests.yml` - Pruebas de seguridad especializadas
+  - `integration-tests.yml` - Tests de integración multi-container
+  - `custom-test-runner.yml` - Ejecutor personalizable para tests específicos
+
+- **PowerShell Testing Framework Mejorado**
+  - Tests locales: `test-build`, `test-security`, `test-full`
+  - Tests remotos via GitHub Actions: `test-remote`, `test-remote-build`, `test-remote-security`, `test-remote-integration`
+  - Gestión de workflows: `workflow-status`, `setup-github`
+  - Integración completa con GitHub CLI
+
+### 🔧 Mejorado
+- **manage.ps1 Enhanced**
+  - Sistema de comandos expandido con 15+ opciones
+  - Soporte para ejecución de tests remotos en GitHub Actions
+  - Gestión automática de parámetros y valores por defecto
+  - Integración con GitHub CLI para automatización completa
+
+- **CI/CD Pipeline Robusto**
+  - Lint y validación de código (Dockerfile, Compose, PowerShell)
+  - Tests paralelos con dependencias optimizadas
+  - Generación automática de reportes y resúmenes
+  - Publicación automática de releases con notas detalladas
+
+- **Documentación Automatizada**
+  - Generación automática de release notes
+  - Resúmenes de tests en GitHub Actions
+  - Validación automática de documentación requerida
+
+### 🚀 Automatización
+- **Triggers Automáticos**: Push a main/develop, Pull Requests, Tags, Dispatch manual
+- **Testing Matrix**: Soporte para diferentes niveles de seguridad y configuraciones
+- **Artifact Management**: Gestión automática de imágenes Docker entre jobs
+- **Release Pipeline**: Publicación automática con versioning semántico
+
+### 📊 Métricas y Monitoreo
+- Tests ejecutados en cada commit/PR
+- Tiempo de ejecución optimizado con paralelización
+- Reportes detallados de cobertura de tests
+- Dashboard completo en GitHub Actions
+
+### 🏆 Estado del Proyecto
+- ✅ Sprint 1 Base: CentOS 9 containers con SSH
+- ✅ Sprint 1 Enhanced: Test automation completo
+- 🔄 Sprint 2 Ready: Preparado para Ansible Control Node
+
+---
+
 ## [1.0.0] - 2025-06-24 - Sprint 1 Release 🚀
 
 ### ✅ Agregado

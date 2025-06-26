@@ -1,0 +1,483 @@
+# ===================================
+# Selective Test Runner - Choose Your Tests
+# ===================================
+
+name: 🎯 Custom Test Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_types:
+        description: 'Select test types to run'
+        required: true
+        type: choice
+        options:
+        - 'all'
+        - 'build,functional'
+        - 'security,integration'
+        - 'build'
+        - 'functional'
+        - 'ssh'
+        - 'security'
+        - 'integration'
+        - 'smoke-test'
+      environment:
+        description: 'Test environment'
+        required: false
+        default: 'ci'
+        type: choice
+        options:
+        - 'ci'
+        - 'staging'
+        - 'local'
+      fail_fast:
+        description: 'Stop on first failure'
+        required: false
+        default: false
+        type: boolean
+      verbose_output:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CONTAINER_NAME: centos9-ansible
+  TEST_ENVIRONMENT: ${{ inputs.environment }}
+
+jobs:
+  # ===================================
+  # Test Selection and Planning
+  # ===================================
+  test-planning:
+    name: 📋 Test Planning
+    runs-on: ubuntu-latest
+    outputs:
+      run_build: ${{ steps.plan.outputs.run_build }}
+      run_functional: ${{ steps.plan.outputs.run_functional }}
+      run_ssh: ${{ steps.plan.outputs.run_ssh }}
+      run_security: ${{ steps.plan.outputs.run_security }}
+      run_integration: ${{ steps.plan.outputs.run_integration }}
+      test_matrix: ${{ steps.plan.outputs.test_matrix }}
+    steps:
+      - name: 📋 Plan test execution
+        id: plan
+        run: |
+          echo "🎯 Planning test execution based on input: ${{ inputs.test_types }}"
+          
+          # Parse test types
+          TEST_TYPES="${{ inputs.test_types }}"
+          
+          # Initialize all tests as false
+          RUN_BUILD=false
+          RUN_FUNCTIONAL=false
+          RUN_SSH=false
+          RUN_SECURITY=false
+          RUN_INTEGRATION=false
+          
+          # Determine which tests to run
+          if [[ "$TEST_TYPES" == "all" ]]; then
+            RUN_BUILD=true
+            RUN_FUNCTIONAL=true
+            RUN_SSH=true
+            RUN_SECURITY=true
+            RUN_INTEGRATION=true
+          elif [[ "$TEST_TYPES" == "smoke-test" ]]; then
+            RUN_BUILD=true
+            RUN_FUNCTIONAL=true
+          else
+            # Parse comma-separated list
+            IFS=',' read -ra TESTS <<< "$TEST_TYPES"
+            for test in "${TESTS[@]}"; do
+              case "$test" in
+                "build") RUN_BUILD=true ;;
+                "functional") RUN_FUNCTIONAL=true ;;
+                "ssh") RUN_SSH=true ;;
+                "security") RUN_SECURITY=true ;;
+                "integration") RUN_INTEGRATION=true ;;
+              esac
+            done
+          fi
+          
+          # Set outputs
+          echo "run_build=$RUN_BUILD" >> $GITHUB_OUTPUT
+          echo "run_functional=$RUN_FUNCTIONAL" >> $GITHUB_OUTPUT
+          echo "run_ssh=$RUN_SSH" >> $GITHUB_OUTPUT
+          echo "run_security=$RUN_SECURITY" >> $GITHUB_OUTPUT
+          echo "run_integration=$RUN_INTEGRATION" >> $GITHUB_OUTPUT
+          
+          # Create test matrix for summary
+          echo "test_matrix={\"build\":$RUN_BUILD,\"functional\":$RUN_FUNCTIONAL,\"ssh\":$RUN_SSH,\"security\":$RUN_SECURITY,\"integration\":$RUN_INTEGRATION}" >> $GITHUB_OUTPUT
+          
+          # Display plan
+          echo "📊 Test Execution Plan:"
+          echo "  🔨 Build Tests: $RUN_BUILD"
+          echo "  ⚡ Functional Tests: $RUN_FUNCTIONAL"
+          echo "  🔐 SSH Tests: $RUN_SSH"
+          echo "  🔒 Security Tests: $RUN_SECURITY"
+          echo "  🔗 Integration Tests: $RUN_INTEGRATION"
+
+  # ===================================
+  # Build Tests (Conditional)
+  # ===================================
+  build-tests:
+    name: 🔨 Build Tests
+    runs-on: ubuntu-latest
+    needs: test-planning
+    if: needs.test-planning.outputs.run_build == 'true'
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build Container Image
+        run: |
+          echo "🔨 Running build tests..."
+          docker build -t ${{ env.CONTAINER_NAME }}:test ./centos9/
+
+      - name: 🔍 Validate Build
+        run: |
+          echo "🔍 Validating container build..."
+          
+          # Basic build validation
+          docker inspect ${{ env.CONTAINER_NAME }}:test >/dev/null
+          echo "✅ Container built successfully"
+          
+          # Check image size
+          SIZE_MB=$(docker images ${{ env.CONTAINER_NAME }}:test --format "{{.Size}}" | sed 's/MB//' | cut -d'.' -f1)
+          echo "📏 Image size: ${SIZE_MB}MB"
+          
+          if [ "${SIZE_MB}" -gt 3000 ] 2>/dev/null; then
+            echo "⚠️ Large image size detected"
+          fi
+
+      - name: 📦 Save image for other tests
+        run: |
+          echo "📦 Saving image artifact..."
+          docker save ${{ env.CONTAINER_NAME }}:test > /tmp/test-image.tar
+
+      - name: 📤 Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-image
+          path: /tmp/test-image.tar
+          retention-days: 1
+
+  # ===================================
+  # Functional Tests (Conditional)
+  # ===================================
+  functional-tests:
+    name: ⚡ Functional Tests
+    runs-on: ubuntu-latest
+    needs: [test-planning, build-tests]
+    if: needs.test-planning.outputs.run_functional == 'true' && (success() || !inputs.fail_fast)
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Download test image
+        uses: actions/download-artifact@v4
+        with:
+          name: test-image
+          path: /tmp
+
+      - name: 🔄 Load test image
+        run: docker load -i /tmp/test-image.tar
+
+      - name: ⚡ Run functional tests
+        run: |
+          echo "⚡ Running functional tests..."
+          
+          # Start container
+          docker run -d --name test-functional -p 2299:22 ${{ env.CONTAINER_NAME }}:test
+          sleep 15
+          
+          # Test SSH service
+          if docker exec test-functional systemctl is-active sshd | grep -q active; then
+            echo "✅ SSH service is active"
+          else
+            echo "❌ SSH service failed"
+            exit 1
+          fi
+          
+          # Test ansible user
+          if docker exec test-functional id ansible >/dev/null 2>&1; then
+            echo "✅ Ansible user exists"
+          else
+            echo "❌ Ansible user missing"
+            exit 1
+          fi
+          
+          # Test Python
+          if docker exec test-functional python3 --version >/dev/null 2>&1; then
+            echo "✅ Python3 available"
+          else
+            echo "❌ Python3 missing"
+            exit 1
+          fi
+
+      - name: 🧹 Cleanup functional tests
+        if: always()
+        run: |
+          docker stop test-functional || true
+          docker rm test-functional || true
+
+  # ===================================
+  # SSH Tests (Conditional)
+  # ===================================
+  ssh-tests:
+    name: 🔐 SSH Tests
+    runs-on: ubuntu-latest
+    needs: [test-planning, build-tests]
+    if: needs.test-planning.outputs.run_ssh == 'true' && (success() || !inputs.fail_fast)
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Download test image
+        uses: actions/download-artifact@v4
+        with:
+          name: test-image
+          path: /tmp
+
+      - name: 🔄 Load test image
+        run: docker load -i /tmp/test-image.tar
+
+      - name: 🔐 Run SSH tests
+        run: |
+          echo "🔐 Running SSH tests..."
+          
+          # Start container
+          docker run -d --name test-ssh -p 2298:22 ${{ env.CONTAINER_NAME }}:test
+          sleep 20
+          
+          # Test SSH configuration
+          docker exec test-ssh sshd -T > sshd_config.txt
+          
+          if grep -q "passwordauthentication yes" sshd_config.txt; then
+            echo "✅ Password authentication enabled"
+          else
+            echo "❌ Password authentication disabled"
+            exit 1
+          fi
+          
+          # Test SSH directory
+          if docker exec test-ssh test -d /home/ansible/.ssh; then
+            echo "✅ SSH directory exists"
+          else
+            echo "❌ SSH directory missing"
+            exit 1
+          fi
+
+      - name: 🧹 Cleanup SSH tests
+        if: always()
+        run: |
+          docker stop test-ssh || true
+          docker rm test-ssh || true
+
+  # ===================================
+  # Security Tests (Conditional)
+  # ===================================
+  security-tests:
+    name: 🔒 Security Tests
+    runs-on: ubuntu-latest
+    needs: [test-planning, build-tests]
+    if: needs.test-planning.outputs.run_security == 'true' && (success() || !inputs.fail_fast)
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Download test image
+        uses: actions/download-artifact@v4
+        with:
+          name: test-image
+          path: /tmp
+
+      - name: 🔄 Load test image
+        run: docker load -i /tmp/test-image.tar
+
+      - name: 🔒 Run security tests
+        run: |
+          echo "🔒 Running security tests..."
+          
+          # Start container
+          docker run -d --name test-security ${{ env.CONTAINER_NAME }}:test
+          sleep 10
+          
+          # Test user configuration
+          if docker exec test-security id ansible >/dev/null 2>&1; then
+            echo "✅ Ansible user exists"
+          else
+            echo "❌ Ansible user missing"
+            exit 1
+          fi
+          
+          # Test sudo configuration
+          if docker exec test-security test -f /etc/sudoers.d/ansible; then
+            echo "✅ Sudo configuration exists"
+          else
+            echo "❌ Sudo configuration missing"
+            exit 1
+          fi
+          
+          # Test file permissions
+          PERMS=$(docker exec test-security stat -c "%a" /home/ansible/.ssh)
+          if [ "$PERMS" == "700" ]; then
+            echo "✅ SSH directory permissions correct"
+          else
+            echo "⚠️ SSH directory permissions: $PERMS"
+          fi
+
+      - name: 🧹 Cleanup security tests
+        if: always()
+        run: |
+          docker stop test-security || true
+          docker rm test-security || true
+
+  # ===================================
+  # Integration Tests (Conditional)
+  # ===================================
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test-planning, build-tests]
+    if: needs.test-planning.outputs.run_integration == 'true' && (success() || !inputs.fail_fast)
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Download test image
+        uses: actions/download-artifact@v4
+        with:
+          name: test-image
+          path: /tmp
+
+      - name: 🔄 Load and tag images
+        run: |
+          docker load -i /tmp/test-image.tar
+          docker tag ${{ env.CONTAINER_NAME }}:test ansible_docker_centos9-node1:latest
+          docker tag ${{ env.CONTAINER_NAME }}:test ansible_docker_centos9-node2:latest
+
+      - name: 🔗 Run integration tests
+        run: |
+          echo "🔗 Running integration tests..."
+          
+          # Start multi-container environment
+          docker-compose up -d
+          sleep 30
+          
+          # Test container count
+          RUNNING_COUNT=$(docker-compose ps --filter "status=running" --services | wc -l)
+          if [ "$RUNNING_COUNT" -eq 2 ]; then
+            echo "✅ Both containers running"
+          else
+            echo "❌ Expected 2 containers, got $RUNNING_COUNT"
+            exit 1
+          fi
+          
+          # Test network connectivity
+          if docker-compose exec -T centos9-node1 ping -c 2 centos9-node2 >/dev/null 2>&1; then
+            echo "✅ Network connectivity working"
+          else
+            echo "❌ Network connectivity failed"
+            exit 1
+          fi
+
+      - name: 🧹 Cleanup integration tests
+        if: always()
+        run: |
+          docker-compose down -v || true
+
+  # ===================================
+  # Test Results Summary
+  # ===================================
+  test-summary:
+    name: 📊 Test Summary
+    runs-on: ubuntu-latest
+    needs: [test-planning, build-tests, functional-tests, ssh-tests, security-tests, integration-tests]
+    if: always()
+    steps:
+      - name: 📊 Generate comprehensive test summary
+        run: |
+          echo "# 🎯 Custom Test Run Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔧 Test Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Types**: ${{ inputs.test_types }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fail Fast**: ${{ inputs.fail_fast }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Verbose Output**: ${{ inputs.verbose_output }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 📋 Test Execution Plan" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔨 Build Tests: ${{ needs.test-planning.outputs.run_build == 'true' && 'Enabled' || 'Skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚡ Functional Tests: ${{ needs.test-planning.outputs.run_functional == 'true' && 'Enabled' || 'Skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔐 SSH Tests: ${{ needs.test-planning.outputs.run_ssh == 'true' && 'Enabled' || 'Skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security Tests: ${{ needs.test-planning.outputs.run_security == 'true' && 'Enabled' || 'Skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Integration Tests: ${{ needs.test-planning.outputs.run_integration == 'true' && 'Enabled' || 'Skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 🎯 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Build tests
+          if [ "${{ needs.test-planning.outputs.run_build }}" == "true" ]; then
+            echo "| 🔨 Build | ${{ needs.build-tests.result == 'success' && '✅ Passed' || (needs.build-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Container build and validation |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔨 Build | ⏭️ Skipped | Not selected for execution |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Functional tests
+          if [ "${{ needs.test-planning.outputs.run_functional }}" == "true" ]; then
+            echo "| ⚡ Functional | ${{ needs.functional-tests.result == 'success' && '✅ Passed' || (needs.functional-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | SSH, user, and Python validation |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ⚡ Functional | ⏭️ Skipped | Not selected for execution |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # SSH tests
+          if [ "${{ needs.test-planning.outputs.run_ssh }}" == "true" ]; then
+            echo "| 🔐 SSH | ${{ needs.ssh-tests.result == 'success' && '✅ Passed' || (needs.ssh-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | SSH configuration and connectivity |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔐 SSH | ⏭️ Skipped | Not selected for execution |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Security tests
+          if [ "${{ needs.test-planning.outputs.run_security }}" == "true" ]; then
+            echo "| 🔒 Security | ${{ needs.security-tests.result == 'success' && '✅ Passed' || (needs.security-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | User permissions and file security |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔒 Security | ⏭️ Skipped | Not selected for execution |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Integration tests
+          if [ "${{ needs.test-planning.outputs.run_integration }}" == "true" ]; then
+            echo "| 🔗 Integration | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || (needs.integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Multi-container orchestration |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔗 Integration | ⏭️ Skipped | Not selected for execution |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall result
+          OVERALL_SUCCESS=true
+          
+          if [ "${{ needs.build-tests.result }}" == "failure" ] || \
+             [ "${{ needs.functional-tests.result }}" == "failure" ] || \
+             [ "${{ needs.ssh-tests.result }}" == "failure" ] || \
+             [ "${{ needs.security-tests.result }}" == "failure" ] || \
+             [ "${{ needs.integration-tests.result }}" == "failure" ]; then
+            OVERALL_SUCCESS=false
+          fi
+          
+          if [ "$OVERALL_SUCCESS" == "true" ]; then
+            echo "## 🎉 Overall Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "All selected tests completed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Overall Result: FAILURE" >> $GITHUB_STEP_SUMMARY
+            echo "Some tests failed. Check the individual test results above." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Test run completed at $(date)*" >> $GITHUB_STEP_SUMMARY
