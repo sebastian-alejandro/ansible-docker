@@ -5,6 +5,43 @@ Todas las modificaciones importantes del proyecto serán documentadas en este ar
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-06-26 - Simplification: Native Docker Commands 🐳
+
+### 🔄 Cambios Importantes
+- **Eliminación de dependencia PowerShell**
+  - Removido `manage.ps1` para simplificar gestión
+  - Migración completa a comandos nativos Docker/Docker Compose
+  - Soporte multiplataforma (Windows, Linux, macOS)
+  - Gestión universal sin dependencias de shell específico
+
+### ✅ Agregado
+- **Documentación de Comandos Nativos**
+  - `docs/comandos-docker-nativos.md` - Guía completa de comandos Docker
+  - README.md actualizado con comandos nativos únicamente
+  - Guías para gestión básica, testing, debugging y troubleshooting
+  - Comandos para scaling, monitoreo y desarrollo
+
+### 🔧 Mejorado
+- **Gestión Simplificada**
+  - Comandos estándar `docker compose` para todas las operaciones
+  - Testing manual con comandos `docker exec` y SSH directo
+  - Troubleshooting nativo con `docker logs` y `docker inspect`
+  - Scaling automático con `docker compose up --scale`
+
+### 📚 Documentación
+- **README.md renovado** con enfoque en comandos nativos
+- **Eliminación de referencias PowerShell** en toda la documentación
+- **Guías paso a paso** para desarrollo y troubleshooting
+- **Compatibilidad multiplataforma** documentada
+
+### 🎯 Beneficios
+- ✅ **Multiplataforma**: Funciona en cualquier OS con Docker
+- ✅ **Simplificado**: Sin dependencias de scripts externos
+- ✅ **Estándar**: Usa comandos Docker universales
+- ✅ **Mantenible**: Menos código, más estabilidad
+
+---
+
 ## [1.1.2] - 2025-06-26 - Critical Fix: PowerShell Script + Project Review 🔧
 
 ### 🐛 Corregido

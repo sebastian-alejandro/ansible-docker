@@ -20,7 +20,7 @@ Este proyecto implementa un ambiente completo de **Ansible** utilizando **Docker
 - [x] **Scripts de inicialización y gestión**
   - Script de inicialización con logging
   - Health check automatizado
-  - Script PowerShell de gestión completo
+  - **Comandos nativos Docker/Docker Compose** para gestión multiplataforma
 
 - [x] **Docker Compose base**
   - Configuración multi-container
@@ -30,6 +30,7 @@ Este proyecto implementa un ambiente completo de **Ansible** utilizando **Docker
 
 - [x] **Documentación completa**
   - Guías de instalación y uso
+  - **Comandos nativos Docker** documentados
   - Troubleshooting
   - Mejores prácticas
 
@@ -60,44 +61,51 @@ Este proyecto implementa un ambiente completo de **Ansible** utilizando **Docker
 
 ### Prerrequisitos
 
-- **Docker Desktop** instalado en Windows
-- **Docker Compose** (incluido en Docker Desktop)
-- **PowerShell** 5.1 o superior
+- **Docker Desktop** instalado (Windows/Linux/macOS)
+- **Docker Compose** v2.0 o superior
+- **SSH Client** para conectividad
 
 ### 1. Clonar y Preparar el Proyecto
 
-```powershell
-# Navegar al directorio del proyecto
-cd c:\yumitt\ansible_docker
+```bash
+# Clonar el repositorio
+git clone https://github.com/sebastian-alejandro/ansible-docker.git
+cd ansible-docker
 
 # Verificar estructura del proyecto
-dir
+ls -la
 ```
 
 ### 2. Construir las Imágenes Docker
 
-```powershell
-# Usar el script de gestión
-.\manage.ps1 build
+```bash
+# Construir todas las imágenes
+docker compose build
 
-# O usando Docker Compose directamente
-docker-compose build
+# Construir con cache limpio (si es necesario)
+docker compose build --no-cache
 ```
 
 ### 3. Iniciar los Containers
 
-```powershell
-# Iniciar todos los containers
-.\manage.ps1 start
+```bash
+# Iniciar todos los containers en background
+docker compose up -d
 
 # Verificar estado
-.\manage.ps1 status
+docker compose ps
 ```
 
 ### 4. Verificar Conectividad
 
-```powershell
-# Ejecutar tests automatizados
+```bash
+# Test de health check interno
+docker exec centos9-node1 /usr/local/bin/health-check.sh
+
+# Test de conectividad SSH
+ssh ansible@localhost -p 2201
+ssh ansible@localhost -p 2202
+```
 .\manage.ps1 test
 
 # Conectarse a un container específico
