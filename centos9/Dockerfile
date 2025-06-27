@@ -45,14 +45,18 @@ RUN dnf -y update && \
         passwd \
         procps-ng \
         glibc-langpack-en \
+        glibc-locale-source \
+        glibc-common \
         systemd \
         systemd-sysv \
         cronie \
         iproute && \
     dnf clean all
 
-# Configurar locale
-RUN localedef -i en_US -f UTF-8 en_US.UTF-8
+# Configurar locale - instalar soporte completo para en_US.UTF-8
+RUN dnf -y reinstall glibc-common && \
+    localedef -i en_US -f UTF-8 en_US.UTF-8 && \
+    echo 'LANG="en_US.UTF-8"' > /etc/locale.conf
 
 # Configurar systemd para containers
 RUN systemctl mask dev-hugepages.mount sys-fs-fuse-connections.mount \
