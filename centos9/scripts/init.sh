@@ -5,6 +5,10 @@
 
 set -e
 
+# Configurar locale
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
 echo "=== Iniciando CentOS 9 Container para Ansible ===" | tee -a /var/log/ansible/init.log
 
 # Función para logging
@@ -16,16 +20,16 @@ log() {
 mkdir -p /var/log/ansible
 chown ansible:ansible /var/log/ansible 2>/dev/null || true
 
-# Inicializar systemd si no está corriendo (para CI/CD)
-if ! pgrep -f systemd > /dev/null; then
+# Verificar si systemd está disponible y no está ejecutándose como PID 1
+if [ "$$" != "1" ] && command -v systemctl &> /dev/null; then
+    log "Detectado systemd disponible pero no como PID 1"
+    # En este caso, inicializar systemd
     log "Iniciando systemd..."
-    exec /sbin/init &
-    sleep 3
+    exec /sbin/init "$@"
 fi
 
-# Esperar a que systemd esté listo
-log "Esperando a que systemd esté listo..."
-timeout 30 bash -c 'while ! systemctl is-system-running --wait > /dev/null 2>&1; do sleep 1; done' || true
+# Si llegamos aquí, somos PID 1 o systemd no está disponible
+log "Ejecutándose como PID 1 o sin systemd"
 
 # Verificar y configurar SSH
 log "Configurando SSH..."
@@ -47,12 +51,13 @@ fi
 # Configurar hostname si se proporciona
 if [ -n "$HOSTNAME" ]; then
     log "Configurando hostname: $HOSTNAME"
-    hostnamectl set-hostname $HOSTNAME
+    echo "$HOSTNAME" > /etc/hostname
+    hostname "$HOSTNAME"
 fi
 
-# Verificar conectividad de red
+# Verificar conectividad de red (opcional, no crítico)
 log "Verificando conectividad de red..."
-if ping -c 1 8.8.8.8 &> /dev/null; then
+if timeout 5 ping -c 1 8.8.8.8 &> /dev/null; then
     log "Conectividad de red: OK"
 else
     log "WARNING: Sin conectividad externa"
@@ -61,23 +66,37 @@ fi
 # Inicializar servicios
 log "Iniciando servicios..."
 
-# Habilitar servicios primero
-systemctl enable sshd || true
-systemctl enable crond || true
-
-# Iniciar servicios con retry
-for service in sshd crond; do
-    log "Iniciando $service..."
-    for i in {1..3}; do
-        if systemctl start $service; then
-            log "$service iniciado correctamente"
-            break
-        else
-            log "Intento $i falló para $service, reintentando..."
-            sleep 2
-        fi
+# Verificar si systemctl está disponible
+if command -v systemctl &> /dev/null; then
+    # Esperar a que systemd esté listo (si estamos usando systemd)
+    log "Esperando a que systemd esté listo..."
+    timeout 60 bash -c 'while ! systemctl is-system-running --wait &>/dev/null; do sleep 1; done' || {
+        log "WARNING: systemd no está completamente listo, continuando..."
+    }
+    
+    # Habilitar servicios primero
+    systemctl enable sshd || true
+    systemctl enable crond || true
+    
+    # Iniciar servicios con retry
+    for service in sshd crond; do
+        log "Iniciando $service..."
+        for i in {1..5}; do
+            if systemctl start $service 2>/dev/null; then
+                log "$service iniciado correctamente"
+                break
+            else
+                log "Intento $i falló para $service, reintentando..."
+                sleep 3
+            fi
+        done
     done
-done
+else
+    # Fallback sin systemd
+    log "systemctl no disponible, iniciando servicios manualmente..."
+    /usr/sbin/sshd -D &
+    /usr/sbin/crond &
+fi
 
 # Verificar que SSH esté escuchando
 log "Verificando puerto SSH..."

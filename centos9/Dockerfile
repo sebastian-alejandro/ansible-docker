@@ -43,10 +43,21 @@ RUN dnf -y update && \
         git \
         which \
         passwd \
-        cronie \
+        procps-ng \
+        glibc-langpack-en \
         systemd \
+        systemd-sysv \
+        cronie \
         iproute && \
     dnf clean all
+
+# Configurar locale
+RUN localedef -i en_US -f UTF-8 en_US.UTF-8
+
+# Configurar systemd para containers
+RUN systemctl mask dev-hugepages.mount sys-fs-fuse-connections.mount \
+    systemd-remount-fs.service dev-mqueue.mount systemd-logind.service && \
+    systemctl enable sshd crond
 
 # Configurar SSH
 RUN ssh-keygen -A && \
@@ -73,9 +84,10 @@ RUN echo "root:rootpass123" | chpasswd
 # Crear directorios necesarios
 RUN mkdir -p /var/run/sshd /var/log/ansible
 
-# Copiar scripts de inicialización
+# Copiar scripts de inicialización y servicios
 COPY scripts/init.sh /usr/local/bin/init.sh
 COPY scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY services/ansible-init.service /etc/systemd/system/
 
 # Hacer ejecutables los scripts
 RUN chmod +x /usr/local/bin/init.sh /usr/local/bin/health-check.sh
@@ -85,12 +97,12 @@ EXPOSE 22
 
 # Configurar systemd (necesario para algunos playbooks de Ansible)
 RUN systemctl enable sshd && \
-    systemctl enable crond
+    systemctl enable crond && \
+    systemctl enable ansible-init
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
     CMD /usr/local/bin/health-check.sh
 
-# Punto de entrada
-ENTRYPOINT ["/usr/local/bin/init.sh"]
-CMD ["/usr/sbin/sshd", "-D"]
+# Para containers con systemd, usar /sbin/init como entrypoint
+ENTRYPOINT ["/sbin/init"]
