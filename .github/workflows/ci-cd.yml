@@ -192,25 +192,43 @@ jobs:
           
           # Wait for entrypoint to complete initialization
           echo "⏳ Waiting for container initialization..."
-          timeout 120 bash -c 'while ! docker exec test-functional systemctl is-system-running 2>/dev/null | grep -E "(running|degraded)" > /dev/null; do 
-            echo "System status: $(docker exec test-functional systemctl is-system-running 2>/dev/null || echo starting)"
-            sleep 5
-          done' || {
-            echo "❌ Container initialization timeout"
-            echo "📋 Current container logs:"
-            docker logs test-functional
-            exit 1
-          }
           
-          # Wait for SSH service specifically
+          # Check if we're in CI fallback mode (no systemd)
+          if docker exec test-functional test -f /run/systemd/system 2>/dev/null; then
+            echo "🔧 Detected systemd mode"
+            timeout 120 bash -c 'while ! docker exec test-functional systemctl is-system-running 2>/dev/null | grep -E "(running|degraded)" > /dev/null; do 
+              echo "System status: $(docker exec test-functional systemctl is-system-running 2>/dev/null || echo starting)"
+              sleep 5
+            done' || {
+              echo "❌ Container initialization timeout"
+              echo "📋 Current container logs:"
+              docker logs test-functional
+              exit 1
+            }
+          else
+            echo "🔧 Detected fallback mode (no systemd)"
+            # Wait for SSH daemon to be running in fallback mode
+            timeout 120 bash -c 'while ! docker exec test-functional pgrep sshd > /dev/null 2>&1; do 
+              echo "SSH process status: $(docker exec test-functional pgrep sshd > /dev/null 2>&1 && echo running || echo starting)"
+              sleep 5
+            done' || {
+              echo "❌ Container initialization timeout in fallback mode"
+              echo "📋 Current container logs:"
+              docker logs test-functional
+              exit 1
+            }
+          fi
+          
+          # Wait for SSH service specifically (compatible with both modes)
           echo "⏳ Waiting for SSH service..."
-          timeout 60 bash -c 'while ! docker exec test-functional systemctl is-active sshd 2>/dev/null | grep -q active; do 
-            echo "SSH status: $(docker exec test-functional systemctl is-active sshd 2>/dev/null || echo failed)"
+          timeout 60 bash -c 'while ! docker exec test-functional netstat -tlnp 2>/dev/null | grep -q ":22 "; do 
+            echo "SSH port status: $(docker exec test-functional netstat -tlnp 2>/dev/null | grep ":22 " > /dev/null && echo listening || echo not_listening)"
             sleep 3
           done' || {
             echo "❌ SSH service failed to start"
             echo "📋 SSH service status:"
-            docker exec test-functional systemctl status sshd || echo "Failed to get SSH status"
+            docker exec test-functional pgrep sshd || echo "SSH daemon not running"
+            docker exec test-functional netstat -tlnp 2>/dev/null | grep ":22 " || echo "SSH port not listening"
             exit 1
           }
           
@@ -231,15 +249,29 @@ jobs:
       - name: 🔐 Test SSH Service
         run: |
           echo "🔐 Testing SSH service..."
-          SSH_STATUS=$(docker exec test-functional systemctl is-active sshd)
-          if [ "$SSH_STATUS" == "active" ]; then
-            echo "✅ SSH service is active"
+          
+          # Check if we're in fallback mode or systemd mode
+          if docker exec test-functional test -f /run/systemd/system 2>/dev/null; then
+            echo "🔧 Testing SSH in systemd mode"
+            SSH_STATUS=$(docker exec test-functional systemctl is-active sshd)
+            if [ "$SSH_STATUS" == "active" ]; then
+              echo "✅ SSH service is active"
+            else
+              echo "❌ SSH service is not active: $SSH_STATUS"
+              exit 1
+            fi
           else
-            echo "❌ SSH service is not active: $SSH_STATUS"
-            exit 1
+            echo "🔧 Testing SSH in fallback mode"
+            # Check if SSH daemon is running
+            if docker exec test-functional pgrep sshd > /dev/null; then
+              echo "✅ SSH daemon is running"
+            else
+              echo "❌ SSH daemon is not running"
+              exit 1
+            fi
           fi
           
-          # Test SSH port listening
+          # Test SSH port listening (works in both modes)
           if docker exec test-functional netstat -tlnp | grep -q ":22 "; then
             echo "✅ SSH port 22 is listening"
           else
@@ -364,6 +396,8 @@ jobs:
           echo "🚀 Starting container for SSH tests..."
           docker run -d --name test-ssh \
             -p 2298:22 \
+            -e CI=true \
+            -e GITHUB_ACTIONS=true \
             --privileged \
             --tmpfs /tmp \
             --tmpfs /run \
@@ -375,13 +409,26 @@ jobs:
           echo "⏳ Waiting for container to start..."
           sleep 30
           
-          # Wait for systemd to be ready
-          echo "⏳ Waiting for systemd..."
-          timeout 60 bash -c 'until docker exec test-ssh systemctl is-system-running --wait 2>/dev/null; do sleep 5; done' || true
+          # Check if we're in CI fallback mode (no systemd)
+          if docker exec test-ssh test -f /run/systemd/system 2>/dev/null; then
+            echo "🔧 Detected systemd mode"
+            # Wait for systemd to be ready
+            echo "⏳ Waiting for systemd..."
+            timeout 60 bash -c 'until docker exec test-ssh systemctl is-system-running --wait 2>/dev/null; do sleep 5; done' || true
+            
+            # Wait for SSH service to be ready
+            echo "⏳ Waiting for SSH service..."
+            timeout 120 bash -c 'until docker exec test-ssh systemctl is-active sshd 2>/dev/null | grep -q active; do sleep 5; done'
+          else
+            echo "🔧 Detected fallback mode (no systemd)"
+            # Wait for SSH daemon to be running in fallback mode
+            echo "⏳ Waiting for SSH daemon..."
+            timeout 120 bash -c 'while ! docker exec test-ssh pgrep sshd > /dev/null 2>&1; do 
+              echo "SSH process status: $(docker exec test-ssh pgrep sshd > /dev/null 2>&1 && echo running || echo starting)"
+              sleep 5
+            done'
+          fi
           
-          # Wait for SSH service to be ready
-          echo "⏳ Waiting for SSH service..."
-          timeout 120 bash -c 'until docker exec test-ssh systemctl is-active sshd 2>/dev/null | grep -q active; do sleep 5; done'
           sleep 10
 
       - name: 🔐 Test SSH Configuration
@@ -498,6 +545,8 @@ jobs:
         run: |
           echo "🚀 Starting container for security tests..."
           docker run -d --name test-security \
+            -e CI=true \
+            -e GITHUB_ACTIONS=true \
             --privileged \
             --tmpfs /tmp \
             --tmpfs /run \
@@ -509,9 +558,17 @@ jobs:
           echo "⏳ Waiting for container to start..."
           sleep 30
           
-          # Wait for systemd to be ready
-          echo "⏳ Waiting for systemd..."
-          timeout 60 bash -c 'until docker exec test-security systemctl is-system-running --wait 2>/dev/null; do sleep 5; done' || true
+          # Check if we're in CI fallback mode (no systemd)
+          if docker exec test-security test -f /run/systemd/system 2>/dev/null; then
+            echo "🔧 Detected systemd mode"
+            # Wait for systemd to be ready
+            echo "⏳ Waiting for systemd..."
+            timeout 60 bash -c 'until docker exec test-security systemctl is-system-running --wait 2>/dev/null; do sleep 5; done' || true
+          else
+            echo "🔧 Detected fallback mode (no systemd)"
+            # Wait for SSH daemon to be running in fallback mode
+            timeout 60 bash -c 'while ! docker exec test-security pgrep sshd > /dev/null 2>&1; do sleep 5; done' || true
+          fi
 
       - name: 👤 Test User Security Configuration
         run: |
@@ -592,13 +649,26 @@ jobs:
           # List of services that should not be running in a minimal container
           UNNECESSARY_SERVICES=("telnet" "ftp" "rsh" "rlogin" "apache2" "nginx")
           
-          for service in "${UNNECESSARY_SERVICES[@]}"; do
-            if docker exec test-security systemctl is-enabled "$service" 2>/dev/null | grep -q enabled; then
-              echo "⚠️ Unnecessary service enabled: $service"
-            else
-              echo "✅ Service $service is disabled or not installed"
-            fi
-          done
+          # Check if we're in systemd mode or fallback mode
+          if docker exec test-security test -f /run/systemd/system 2>/dev/null; then
+            echo "🔧 Testing services in systemd mode"
+            for service in "${UNNECESSARY_SERVICES[@]}"; do
+              if docker exec test-security systemctl is-enabled "$service" 2>/dev/null | grep -q enabled; then
+                echo "⚠️ Unnecessary service enabled: $service"
+              else
+                echo "✅ Service $service is disabled or not installed"
+              fi
+            done
+          else
+            echo "🔧 Testing services in fallback mode"
+            for service in "${UNNECESSARY_SERVICES[@]}"; do
+              if docker exec test-security pgrep "$service" > /dev/null 2>&1; then
+                echo "⚠️ Unnecessary service running: $service"
+              else
+                echo "✅ Service $service is not running"
+              fi
+            done
+          fi
 
       - name: 🔍 Test Container Security Context
         run: |
