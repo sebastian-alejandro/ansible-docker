@@ -173,8 +173,6 @@ docker compose exec centos9-node-3 bash
 
 ## 📚 Documentación por Sprints
 
-## 📚 Documentación por Sprints
-
 > 📖 **[Visión Completa del Proyecto](docs/project-vision.md)** - Arquitectura evolutiva y roadmap detallado
 
 ### Sprint 1: ✅ Completado (v1.2.0) - **ACTUAL**
