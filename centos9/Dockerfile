@@ -11,13 +11,16 @@ LABEL maintainer="DevOps Team"
 LABEL description="CentOS 9 Stream container optimized for Ansible management"
 LABEL version="1.0"
 
+# Instalar Dockerfile healthcheck y setear shell con pipefail
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Variables de entorno
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 ENV ANSIBLE_USER=ansible
 ENV ANSIBLE_USER_HOME=/home/ansible
 
-# Actualizar sistema e instalar paquetes esenciales
+# Actualizar sistema e instalar paquetes esenciales con versiones específicas
 RUN dnf -y update && \
     dnf -y install epel-release && \
     dnf -y install --allowerasing \

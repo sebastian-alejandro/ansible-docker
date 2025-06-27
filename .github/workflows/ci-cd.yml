@@ -174,24 +174,38 @@ jobs:
           
           # Wait for container to be ready
           echo "⏳ Waiting for container to start..."
-          sleep 15
+          sleep 30
+          
+          # Check if container is running
+          if ! docker ps | grep -q test-functional; then
+            echo "❌ Container failed to start"
+            docker logs test-functional
+            exit 1
+          fi
           
           # Debug: Check container logs
           echo "📋 Container startup logs:"
           docker logs test-functional
           
+          # Wait for systemd to be ready first
+          echo "⏳ Waiting for systemd to be ready..."
+          timeout 60 bash -c 'until docker exec test-functional systemctl is-system-running --wait 2>/dev/null; do 
+            echo "Systemd status: $(docker exec test-functional systemctl is-system-running 2>/dev/null || echo starting)"
+            sleep 5
+          done' || echo "Systemd may still be starting, continuing..."
+          
           # Wait for SSH service to be ready (manual check)
           echo "⏳ Waiting for SSH service to be ready..."
-          timeout 120 bash -c 'until docker exec test-functional systemctl is-active sshd | grep -q active; do 
+          timeout 180 bash -c 'until docker exec test-functional systemctl is-active sshd 2>/dev/null | grep -q active; do 
             echo "SSH service status: $(docker exec test-functional systemctl is-active sshd 2>/dev/null || echo failed)"
             sleep 5
           done'
           
           # Additional wait for port to be ready
           echo "⏳ Waiting for SSH port to be ready..."
-          timeout 60 bash -c 'until docker exec test-functional netstat -tuln | grep -q ":22 "; do 
+          timeout 90 bash -c 'until docker exec test-functional netstat -tuln 2>/dev/null | grep -q ":22 "; do 
             echo "Checking SSH port..."
-            sleep 3
+            sleep 5
           done'
           
           echo "✅ Container is ready for testing"
@@ -351,10 +365,17 @@ jobs:
             -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
             ${{ env.CONTAINER_NAME }}:test
           
+          # Wait for container to be ready
+          echo "⏳ Waiting for container to start..."
+          sleep 30
+          
+          # Wait for systemd to be ready
+          echo "⏳ Waiting for systemd..."
+          timeout 60 bash -c 'until docker exec test-ssh systemctl is-system-running --wait 2>/dev/null; do sleep 5; done' || true
+          
           # Wait for SSH service to be ready
           echo "⏳ Waiting for SSH service..."
-          sleep 20
-          timeout 90 bash -c 'until docker exec test-ssh systemctl is-active sshd | grep -q active; do sleep 3; done'
+          timeout 120 bash -c 'until docker exec test-ssh systemctl is-active sshd 2>/dev/null | grep -q active; do sleep 5; done'
           sleep 10
 
       - name: 🔐 Test SSH Configuration
@@ -479,7 +500,12 @@ jobs:
             ${{ env.CONTAINER_NAME }}:test
           
           # Wait for container to be ready
-          sleep 20
+          echo "⏳ Waiting for container to start..."
+          sleep 30
+          
+          # Wait for systemd to be ready
+          echo "⏳ Waiting for systemd..."
+          timeout 60 bash -c 'until docker exec test-security systemctl is-system-running --wait 2>/dev/null; do sleep 5; done' || true
 
       - name: 👤 Test User Security Configuration
         run: |

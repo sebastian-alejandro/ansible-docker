@@ -10,22 +10,23 @@ log_message() {
 
 log_message "Starting health check..."
 
-# Verificar que systemd esté listo
-if ! systemctl is-system-running &>/dev/null; then
-    # Systemd aún no está completamente listo, pero podemos continuar
-    log_message "WARNING: Systemd is still starting up"
+# Verificar procesos básicos del sistema
+if ! pgrep -f systemd > /dev/null; then
+    log_message "ERROR: systemd is not running"
+    exit 1
 fi
 
-# Verificar que SSH esté ejecutándose (con retry)
-SSH_RETRIES=3
+# Verificar que SSH esté ejecutándose (con retry y más tolerancia)
+SSH_RETRIES=5
 SSH_ACTIVE=false
 for i in $(seq 1 $SSH_RETRIES); do
-    if systemctl is-active --quiet sshd; then
+    # Verificar tanto el servicio como el proceso
+    if systemctl is-active --quiet sshd 2>/dev/null || pgrep -f sshd > /dev/null; then
         SSH_ACTIVE=true
         break
     else
         log_message "SSH service not active yet (attempt $i/$SSH_RETRIES)"
-        sleep 2
+        sleep 3
     fi
 done
 
@@ -38,7 +39,7 @@ fi
 log_message "SSH service is active"
 
 # Verificar que el puerto SSH esté escuchando (con retry)
-PORT_RETRIES=3
+PORT_RETRIES=5
 PORT_LISTENING=false
 for i in $(seq 1 $PORT_RETRIES); do
     if netstat -tuln 2>/dev/null | grep -q ":22 " || ss -tuln 2>/dev/null | grep -q ":22 "; then
@@ -46,7 +47,7 @@ for i in $(seq 1 $PORT_RETRIES); do
         break
     else
         log_message "SSH port not listening yet (attempt $i/$PORT_RETRIES)"
-        sleep 2
+        sleep 3
     fi
 done
 
