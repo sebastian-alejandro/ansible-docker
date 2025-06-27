@@ -165,6 +165,8 @@ jobs:
           echo "🚀 Starting container for functional tests..."
           docker run -d --name test-functional \
             -p 2299:22 \
+            -e CI=true \
+            -e GITHUB_ACTIONS=true \
             --privileged \
             --tmpfs /tmp \
             --tmpfs /run \
@@ -174,39 +176,43 @@ jobs:
           
           # Wait for container to be ready
           echo "⏳ Waiting for container to start..."
-          sleep 30
+          sleep 10
           
           # Check if container is running
           if ! docker ps | grep -q test-functional; then
             echo "❌ Container failed to start"
+            echo "📋 Container logs:"
             docker logs test-functional
+            echo "📋 Container status:"
+            docker ps -a | grep test-functional || echo "Container not found"
             exit 1
           fi
           
-          # Debug: Check container logs
-          echo "📋 Container startup logs:"
-          docker logs test-functional
+          echo "✅ Container started successfully"
           
-          # Wait for systemd to be ready first
-          echo "⏳ Waiting for systemd to be ready..."
-          timeout 60 bash -c 'until docker exec test-functional systemctl is-system-running --wait 2>/dev/null; do 
-            echo "Systemd status: $(docker exec test-functional systemctl is-system-running 2>/dev/null || echo starting)"
+          # Wait for entrypoint to complete initialization
+          echo "⏳ Waiting for container initialization..."
+          timeout 120 bash -c 'while ! docker exec test-functional systemctl is-system-running 2>/dev/null | grep -E "(running|degraded)" > /dev/null; do 
+            echo "System status: $(docker exec test-functional systemctl is-system-running 2>/dev/null || echo starting)"
             sleep 5
-          done' || echo "Systemd may still be starting, continuing..."
+          done' || {
+            echo "❌ Container initialization timeout"
+            echo "📋 Current container logs:"
+            docker logs test-functional
+            exit 1
+          }
           
-          # Wait for SSH service to be ready (manual check)
-          echo "⏳ Waiting for SSH service to be ready..."
-          timeout 180 bash -c 'until docker exec test-functional systemctl is-active sshd 2>/dev/null | grep -q active; do 
-            echo "SSH service status: $(docker exec test-functional systemctl is-active sshd 2>/dev/null || echo failed)"
-            sleep 5
-          done'
-          
-          # Additional wait for port to be ready
-          echo "⏳ Waiting for SSH port to be ready..."
-          timeout 90 bash -c 'until docker exec test-functional netstat -tuln 2>/dev/null | grep -q ":22 "; do 
-            echo "Checking SSH port..."
-            sleep 5
-          done'
+          # Wait for SSH service specifically
+          echo "⏳ Waiting for SSH service..."
+          timeout 60 bash -c 'while ! docker exec test-functional systemctl is-active sshd 2>/dev/null | grep -q active; do 
+            echo "SSH status: $(docker exec test-functional systemctl is-active sshd 2>/dev/null || echo failed)"
+            sleep 3
+          done' || {
+            echo "❌ SSH service failed to start"
+            echo "📋 SSH service status:"
+            docker exec test-functional systemctl status sshd || echo "Failed to get SSH status"
+            exit 1
+          }
           
           echo "✅ Container is ready for testing"
 

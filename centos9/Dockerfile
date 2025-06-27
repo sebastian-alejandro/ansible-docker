@@ -91,10 +91,11 @@ RUN mkdir -p /var/run/sshd /var/log/ansible
 # Copiar scripts de inicialización y servicios
 COPY scripts/init.sh /usr/local/bin/init.sh
 COPY scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY services/ansible-init.service /etc/systemd/system/
 
 # Hacer ejecutables los scripts
-RUN chmod +x /usr/local/bin/init.sh /usr/local/bin/health-check.sh
+RUN chmod +x /usr/local/bin/init.sh /usr/local/bin/health-check.sh /usr/local/bin/entrypoint.sh
 
 # Exponer puerto SSH
 EXPOSE 22
@@ -108,5 +109,5 @@ RUN systemctl enable sshd && \
 HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
     CMD /usr/local/bin/health-check.sh
 
-# Para containers con systemd, usar /sbin/init como entrypoint
-ENTRYPOINT ["/sbin/init"]
+# Para containers con systemd, usar entrypoint inteligente
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
