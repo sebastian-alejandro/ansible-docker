@@ -5,7 +5,29 @@ Todas las modificaciones importantes del proyecto serán documentadas en este ar
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.1] - 2025-06-26 - Critical Fix: Docker Build Errors 🔧
+## [1.2.1] - 2025-06-27 - Hotfix: CI/CD netcat Package Installation 🔧
+
+### 🐛 Corregido
+- **CI/CD Pipeline netcat Installation Error**
+  - Reemplazado paquete genérico `netcat` con `netcat-openbsd` en workflow ci-cd.yml
+  - Resuelto error "Package 'netcat' has no installation candidate" en Ubuntu runners
+  - Alineada configuración con integration-tests.yml para consistencia
+  - Corregidas pruebas de mapeo de puertos en pipeline CI/CD
+
+### 🔧 Técnico
+- El paquete `netcat` es virtual en Ubuntu/Debian y requiere especificar implementación
+- Uso de `netcat-openbsd` como implementación estándar
+- Consistencia entre todos los workflows de GitHub Actions
+- Prevención de fallos en Integration Tests del pipeline
+
+### 🧪 Testing
+- ✅ Pipeline CI/CD ahora ejecuta exitosamente las pruebas de puerto
+- ✅ Consistencia entre integration-tests.yml y ci-cd.yml
+- ✅ Resolución del error de instalación de paquetes en runners Ubuntu
+
+---
+
+## [1.2.0] - 2025-06-26 - Critical Fix: Docker Build Errors 🔧
 
 ### 🐛 Corregido
 - **Docker Build Critical Error**
