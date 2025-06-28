@@ -773,14 +773,14 @@ jobs:
           echo "🌐 Testing network connectivity..."
           
           # Test ping between containers
-          if docker compose exec -T centos9-node1 ping -c 2 centos9-node2; then
+          if docker compose exec -T centos9-node-1 ping -c 2 centos9-node-2; then
             echo "✅ Node1 can ping Node2"
           else
             echo "❌ Node1 cannot ping Node2"
             exit 1
           fi
           
-          if docker compose exec -T centos9-node2 ping -c 2 centos9-node1; then
+          if docker compose exec -T centos9-node-2 ping -c 2 centos9-node-1; then
             echo "✅ Node2 can ping Node1"
           else
             echo "❌ Node2 cannot ping Node1"
@@ -810,7 +810,7 @@ jobs:
         run: |
           echo "❤️ Testing container health status..."
           
-          CONTAINERS=("centos9-node1" "centos9-node2")
+          CONTAINERS=("centos9-node-1" "centos9-node-2")
           for container in "${CONTAINERS[@]}"; do
             # Wait a bit more for health checks to complete
             sleep 10
@@ -840,14 +840,14 @@ jobs:
           echo "💾 Testing volume persistence..."
           
           # Create test file in node1
-          docker compose exec -T centos9-node1 bash -c "mkdir -p /home/ansible/test && echo 'persistence-test' > /home/ansible/test/persistence.txt"
+          docker compose exec -T centos9-node-1 bash -c "mkdir -p /home/ansible/test && echo 'persistence-test' > /home/ansible/test/persistence.txt"
           
           # Restart the container
-          docker compose restart centos9-node1
+          docker compose restart centos9-node-1
           sleep 15
           
           # Check if file persists
-          if docker compose exec -T centos9-node1 cat /home/ansible/test/persistence.txt | grep -q "persistence-test"; then
+          if docker compose exec -T centos9-node-1 cat /home/ansible/test/persistence.txt | grep -q "persistence-test"; then
             echo "✅ Volume persistence working"
           else
             echo "❌ Volume persistence failed"
