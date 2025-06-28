@@ -29,6 +29,7 @@ RUN dnf update -y && \
         sshpass \
         which \
         procps-ng \
+        iputils \
         systemd \
         systemd-sysv && \
     dnf clean all

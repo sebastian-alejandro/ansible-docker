@@ -44,6 +44,7 @@ RUN dnf -y update && \
         which \
         passwd \
         procps-ng \
+        iputils \
         glibc-langpack-en \
         glibc-locale-source \
         glibc-common \
