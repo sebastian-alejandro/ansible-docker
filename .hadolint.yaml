@@ -1,0 +1,15 @@
+---
+# Hadolint configuration for Ansible Docker Environment
+# Ignoring specific rules that are not applicable for development containers
+
+ignored:
+  - DL3041  # Ignore "Specify version with dnf install" for development flexibility
+
+# Allow specific trusted registries
+trustedRegistries:
+  - docker.io
+  - quay.io
+  - ghcr.io
+
+# Set failure threshold
+failure-threshold: error  # Only fail on errors, not warnings

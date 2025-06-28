@@ -890,7 +890,8 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: centos9/Dockerfile
-          failure-threshold: warning
+          config: .hadolint.yaml
+          failure-threshold: error
 
       - name: 🔧 Validate Docker Compose
         run: |
