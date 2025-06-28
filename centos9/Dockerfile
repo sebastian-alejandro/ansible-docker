@@ -80,7 +80,9 @@ RUN useradd -m -s /bin/bash $ANSIBLE_USER && \
 
 # Configurar sudo sin password para el usuario ansible
 RUN echo "$ANSIBLE_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/ansible && \
-    chmod 440 /etc/sudoers.d/ansible
+    chmod 440 /etc/sudoers.d/ansible && \
+    echo "Defaults:$ANSIBLE_USER !requiretty" >> /etc/sudoers.d/ansible && \
+    echo "Defaults:$ANSIBLE_USER !pam_session" >> /etc/sudoers.d/ansible
 
 # Configurar root password
 RUN echo "root:rootpass123" | chpasswd

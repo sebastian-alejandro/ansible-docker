@@ -99,7 +99,7 @@ start_services() {
     if ! systemctl is-active --quiet crond; then
         echo "Starting cron service..."
         systemctl start crond
-        if systemctl is-active --quiet crond; then
+        if systemctl is_active --quiet crond; then
             echo -e "${GREEN}✅ Cron service started${NC}"
         else
             echo -e "${YELLOW}⚠️ Cron service failed to start (non-critical)${NC}"
@@ -152,6 +152,49 @@ validate_environment() {
     fi
 }
 
+# Function to configure CI environment
+configure_ci_environment() {
+    echo -e "${YELLOW}🔧 Configuring CI environment...${NC}"
+    
+    # Fix PAM issues in CI environment
+    if [ "${CI_MODE}" = "true" ]; then
+        echo "Configuring PAM for CI environment..."
+        
+        # Create a minimal PAM configuration for sudo that bypasses problematic modules
+        cat > /etc/pam.d/sudo-ci << 'EOF'
+#%PAM-1.0
+auth       sufficient   pam_permit.so
+account    sufficient   pam_permit.so
+session    optional     pam_keyinit.so revoke
+session    optional     pam_limits.so
+session    [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+session    required     pam_unix.so
+EOF
+        
+        # Backup original sudo PAM config and use CI version
+        if [ -f /etc/pam.d/sudo ]; then
+            cp /etc/pam.d/sudo /etc/pam.d/sudo.backup
+            cp /etc/pam.d/sudo-ci /etc/pam.d/sudo
+            echo -e "${GREEN}✅ PAM configuration updated for CI${NC}"
+        fi
+        
+        # Also configure su for CI
+        cat > /etc/pam.d/su-ci << 'EOF'
+#%PAM-1.0
+auth       sufficient   pam_permit.so
+account    sufficient   pam_permit.so
+session    optional     pam_keyinit.so revoke
+session    required     pam_unix.so
+EOF
+        
+        if [ -f /etc/pam.d/su ]; then
+            cp /etc/pam.d/su /etc/pam.d/su.backup
+            cp /etc/pam.d/su-ci /etc/pam.d/su
+            echo -e "${GREEN}✅ SU PAM configuration updated for CI${NC}"
+        fi
+    fi
+}
+
 # Main execution
 main() {
     # If running in CI mode with arguments, handle them
@@ -163,6 +206,9 @@ main() {
     # Check if systemd is available and working
     if [ ! -d /run/systemd/system ] || [ ! -f /sbin/init ] || [ $CI_MODE = true ]; then
         echo -e "${YELLOW}🔧 Using fallback mode (no systemd or CI environment)${NC}"
+        
+        # Configure CI environment if needed
+        configure_ci_environment
         
         # Start services in fallback mode
         if ! start_services_fallback; then
@@ -209,6 +255,9 @@ main() {
     if ! wait_for_systemd; then
         echo -e "${YELLOW}⚠️ Systemd initialization failed, falling back to direct service mode${NC}"
         kill $INIT_PID 2>/dev/null || true
+        
+        # Configure CI environment if needed
+        configure_ci_environment
         
         # Start services in fallback mode
         if ! start_services_fallback; then
