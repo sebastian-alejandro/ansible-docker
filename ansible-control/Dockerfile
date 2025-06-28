@@ -15,7 +15,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Instalar paquetes base y Python
 RUN dnf update -y && \
-    dnf install -y \
+    dnf install -y --allowerasing \
         python3 \
         python3-pip \
         openssh-clients \
