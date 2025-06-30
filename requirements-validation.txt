@@ -1,0 +1,20 @@
+# Requirements for validate_phase1.py script
+# 
+# Core dependencies (required):
+# - Python 3.7+
+# - Docker
+# - Docker Compose
+#
+# Optional dependencies for enhanced functionality:
+
+# For colored output on Windows
+colorama>=0.4.4
+
+# For YAML validation (optional)
+yamllint>=1.26.0
+
+# For enhanced JSON handling (usually included in Python)
+# None required for basic functionality
+
+# Note: The script will work without these optional dependencies,
+# but some features may be disabled or have reduced functionality.
