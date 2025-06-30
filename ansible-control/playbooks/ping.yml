@@ -1,7 +1,7 @@
 ---
-# Playbook básico de ping para verificar conectividad
-- name: Test de Conectividad - Ping a todos los hosts
-  hosts: all
+# Playbook básico de ping para verificar conectividad v1.3.0
+- name: Test de Conectividad - Ping a nodos managed
+  hosts: managed_nodes
   gather_facts: false
   tasks:
     - name: Ping test
