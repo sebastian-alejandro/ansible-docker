@@ -202,3 +202,13 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for development guidelines.
 
 ### Issues
 Report issues via [GitHub Issues](https://github.com/sebastian-alejandro/ansible-docker/issues)
+
+## Documentation Index
+
+### Core Documentation
+- [Project Architecture](project-architecture.md): Technical architecture and development roadmap
+- [Technical Reference](technical-reference.md): Docker commands and development guides  
+- [Release Notes](release-notes.md): Current version features and specifications
+
+### Troubleshooting
+- [CI/CD Fixes Report](ci-cd-fixes-report.md): Historical issues and solutions
