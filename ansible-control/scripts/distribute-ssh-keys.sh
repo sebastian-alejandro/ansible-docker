@@ -1,5 +1,6 @@
 #!/bin/bash
-# Script para distribuir claves SSH desde el nodo de control a los nodos managed
+# Script para distribuir claves SSH desde el nodo de control a los nodos managed v1.3.0
+# Siguiendo las especificaciones del plan de desarrollo
 
 set -e
 
@@ -8,46 +9,35 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] SSH-DIST: $1"
 }
 
-log "🔐 Iniciando distribución de claves SSH..."
+log "🔐 Iniciando distribución de claves SSH v1.3.0..."
 
-# Verificar que estamos ejecutando como usuario ansible
-if [ "$USER" != "ansible" ]; then
-    log "❌ Este script debe ejecutarse como usuario 'ansible'"
-    exit 1
-fi
+# Lista de nodos managed según especificaciones v1.3.0
+MANAGED_NODES=("centos9-node-1" "centos9-node-2")
+SSH_PASSWORD="ansible123"
 
-# Verificar que existe la clave pública
-PUBLIC_KEY="$HOME/.ssh/id_rsa.pub"
-if [ ! -f "$PUBLIC_KEY" ]; then
-    log "❌ Clave pública no encontrada: $PUBLIC_KEY"
-    log "🔧 Ejecutando generación de claves SSH..."
-    /usr/local/bin/generate-ssh-keys.sh
-fi
-
-# Lista de nodos de destino
-NODES=(
-    "centos9-node-1"
-    "centos9-node-2"
-    "centos9-node-3"
-)
-
-# Credenciales temporales para distribución inicial
-TEMP_PASSWORD="ansible123"
-
-log "📋 Distribuyendo clave pública a ${#NODES[@]} nodos..."
-
-# Función para distribuir clave a un nodo
-distribute_key_to_node() {
-    local node=$1
-    local max_retries=5
-    local retry_delay=10
+for node in "${MANAGED_NODES[@]}"; do
+    log "🎯 Distribuyendo clave SSH a $node..."
     
-    log "🎯 Distribuyendo clave a $node..."
+    # Wait for node to be ready
+    until nc -z $node 22; do
+        log "⏳ Esperando servicio SSH de $node..."
+        sleep 5
+    done
     
-    # Esperar a que el nodo esté disponible
-    local retry_count=0
-    while [ $retry_count -lt $max_retries ]; do
-        if ping -c 1 $node > /dev/null 2>&1; then
+    # Copy SSH key
+    sshpass -p "$SSH_PASSWORD" ssh-copy-id \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        ansible@$node
+    
+    if [ $? -eq 0 ]; then
+        log "✅ Clave SSH distribuida a $node"
+    else
+        log "❌ Falló distribución de clave SSH a $node"
+    fi
+done
+
+log "✅ Distribución de claves SSH completada"
             log "✅ $node está disponible"
             break
         else

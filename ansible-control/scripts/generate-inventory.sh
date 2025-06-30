@@ -1,5 +1,6 @@
 #!/bin/bash
-# Script para generar inventario dinámico de Ansible
+# Script para generar inventario dinámico de Ansible v1.3.0
+# Siguiendo las especificaciones del plan de desarrollo
 
 set -e
 
@@ -8,46 +9,41 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] INVENTORY: $1"
 }
 
-log "📋 Generando inventario dinámico de Ansible..."
+log "📋 Generando inventario dinámico de Ansible v1.3.0..."
 
 # Directorio de inventario
-INVENTORY_DIR="/home/ansible/inventory"
-HOSTS_FILE="$INVENTORY_DIR/hosts"
-GROUP_VARS_DIR="$INVENTORY_DIR/group_vars"
-HOST_VARS_DIR="$INVENTORY_DIR/host_vars"
+INVENTORY_DIR="/ansible/inventory"
+HOSTS_FILE="$INVENTORY_DIR/hosts.yml"
+GROUP_VARS_DIR="/ansible/group_vars"
+HOST_VARS_DIR="/ansible/host_vars"
 
 # Crear directorios si no existen
 mkdir -p "$INVENTORY_DIR" "$GROUP_VARS_DIR" "$HOST_VARS_DIR"
 
-# Generar archivo de hosts principal
-log "📝 Creando archivo de hosts principal..."
+# Generar archivo de hosts principal en formato YAML
+log "📝 Creando archivo de hosts principal en formato YAML..."
 cat > "$HOSTS_FILE" << 'EOF'
-# Inventario dinámico del laboratorio Ansible
-# Generado automáticamente
+# Inventario dinámico del laboratorio Ansible v1.3.0
+# Generado automáticamente siguiendo especificaciones del plan
 
-[control]
-ansible-control ansible_host=ansible-control ansible_connection=local
-
-[nodes]
-centos9-node-1 ansible_host=centos9-node-1
-centos9-node-2 ansible_host=centos9-node-2
-centos9-node-3 ansible_host=centos9-node-3
-
-[webservers]
-centos9-node-1
-centos9-node-2
-
-[databases]
-centos9-node-3
-
-[production:children]
-webservers
-databases
-
-[all:vars]
-ansible_user=ansible
-ansible_ssh_private_key_file=~/.ssh/id_rsa
-ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+all:
+  children:
+    managed_nodes:
+      hosts:
+        centos9-node-1:
+          ansible_host: centos9-node-1
+          node_id: 1
+          ssh_port: 22
+          environment: lab
+        centos9-node-2:
+          ansible_host: centos9-node-2
+          node_id: 2
+          ssh_port: 22
+          environment: lab
+      vars:
+        ansible_user: ansible
+        ansible_ssh_private_key_file: /home/ansible/.ssh/id_rsa
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 ansible_become=yes
 ansible_become_method=sudo
 ansible_become_user=root
