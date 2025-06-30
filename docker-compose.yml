@@ -5,46 +5,34 @@
 
 services:
   # ===================================
-  # Ansible Control Node - Rocky Linux 9
+  # Ansible Control Node - CentOS Stream 9
   # ===================================
   ansible-control:
-    build: 
+    build:
       context: ./ansible-control
       dockerfile: Dockerfile
     container_name: ansible-control
     hostname: ansible-control
     ports:
-      - "2200:22"  # SSH port mapping for control node
-    environment:
-      - TZ=America/Mexico_City
-      - HOSTNAME=ansible-control
-      - ANSIBLE_USER=ansible
-    volumes:
-      - ansible-control-data:/home/ansible
-      - ansible-control-ssh:/home/ansible/.ssh
-      - ansible-playbooks:/home/ansible/playbooks
-      - ansible-inventory:/home/ansible/inventory
+      - "2200:22"
     networks:
       - ansible-network
-    restart: unless-stopped
-    privileged: true  # Required for systemd
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp:unconfined
-    tmpfs:
-      - /run
-      - /tmp
-    healthcheck:
-      test: ["CMD", "/usr/local/bin/health-check-control.sh"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 60s
+    volumes:
+      - ansible-data:/ansible
+      - ssh-keys:/home/ansible/.ssh
+    environment:
+      - ANSIBLE_HOST_KEY_CHECKING=False
+      - ANSIBLE_SSH_PIPELINING=True
     depends_on:
       - centos9-node-1
       - centos9-node-2
-      - centos9-node-3
+    healthcheck:
+      test: ["CMD", "ansible", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
 
   # ===================================
   # CentOS 9 - Managed Nodes
@@ -113,55 +101,17 @@ services:
       retries: 3
       start_period: 40s
 
-  centos9-node-3:
-    build: 
-      context: ./centos9
-      dockerfile: Dockerfile
-    container_name: centos9-node-3
-    hostname: centos9-node-3
-    ports:
-      - "2203:22"  # SSH port mapping
-    environment:
-      - TZ=America/Mexico_City
-      - HOSTNAME=centos9-node-3
-    volumes:
-      - centos9-node-3-data:/home/ansible
-      - centos9-node-3-logs:/var/log/ansible
-    networks:
-      - ansible-network
-    restart: unless-stopped
-    privileged: true  # Required for systemd
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp:unconfined
-    tmpfs:
-      - /run
-      - /tmp
-    healthcheck:
-      test: ["CMD", "/usr/local/bin/health-check.sh"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
 # ===================================
 # Volumes para persistencia de datos
 # ===================================
 volumes:
-  # Volúmenes del nodo de control
-  ansible-control-data:
+  # Volúmenes del nodo de control (v1.3.0)
+  ansible-data:
     driver: local
-    name: ansible_control_data
-  ansible-control-ssh:
+    name: ansible_data
+  ssh-keys:
     driver: local
-    name: ansible_control_ssh
-  ansible-playbooks:
-    driver: local
-    name: ansible_playbooks
-  ansible-inventory:
-    driver: local
-    name: ansible_inventory
+    name: ssh_keys
   
   # Volúmenes de los nodos managed
   centos9-node-1-data:
@@ -176,12 +126,6 @@ volumes:
   centos9-node-2-logs:
     driver: local
     name: ansible_centos9_node2_logs
-  centos9-node-3-data:
-    driver: local
-    name: ansible_centos9_node3_data
-  centos9-node-3-logs:
-    driver: local
-    name: ansible_centos9_node3_logs
 
 # ===================================
 # Red interna para comunicación
