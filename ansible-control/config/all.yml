@@ -1,0 +1,21 @@
+# Variables globales para todos los hosts v1.3.0
+---
+# Información del proyecto
+project_name: "Ansible Docker Lab"
+project_version: "1.3.0" 
+project_codename: "Ansible Control Node"
+
+# Configuración de timezone
+timezone: "UTC"
+
+# Configuración de logging
+log_level: "INFO"
+ansible_log_path: "/ansible/ansible.log"
+
+# Configuración de red
+docker_network: "ansible-network"
+ssh_port: 22
+
+# Configuración de usuario
+default_user: "ansible"
+user_shell: "/bin/bash"

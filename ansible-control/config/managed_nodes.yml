@@ -1,0 +1,18 @@
+# Variables para el grupo managed_nodes v1.3.0
+---
+# Configuración SSH
+ansible_user: ansible
+ansible_ssh_private_key_file: /home/ansible/.ssh/id_rsa
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+# Configuración del entorno
+environment: lab
+lab_version: "1.3.0"
+
+# Configuración de timeouts
+ansible_ssh_timeout: 30
+ansible_command_timeout: 30
+
+# Variables del laboratorio
+lab_name: "Ansible Control Node Lab"
+management_network: "ansible-network"
