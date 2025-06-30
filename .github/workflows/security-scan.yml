@@ -1,0 +1,104 @@
+name: Container Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'ansible-control/Dockerfile'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'ansible-control/Dockerfile'
+  schedule:
+    # Ejecutar escaneo de seguridad semanalmente
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Container for Scanning
+      run: |
+        echo "🏗️ Building container for security scanning..."
+        docker compose build ansible-control
+    
+    - name: Run Trivy Container Scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'ansible_docker-ansible-control:latest'
+        format: 'sarif'
+        output: 'trivy-container-results.sarif'
+    
+    - name: Upload Trivy Container Results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-container-results.sarif'
+    
+    - name: Run Grype Vulnerability Scanner
+      uses: anchore/scan-action@v3
+      id: grype-scan
+      with:
+        image: 'ansible_docker-ansible-control:latest'
+        fail-build: false
+        severity-cutoff: high
+    
+    - name: Upload Grype Results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: ${{ steps.grype-scan.outputs.sarif }}
+    
+    - name: Docker Scout Scan
+      if: github.event_name != 'pull_request'
+      uses: docker/scout-action@v1
+      with:
+        command: cves
+        image: 'ansible_docker-ansible-control:latest'
+        format: sarif
+        output: scout-results.sarif
+    
+    - name: Generate Security Report
+      if: always()
+      run: |
+        echo "🛡️ Security Scan Summary" > security-report.md
+        echo "======================" >> security-report.md
+        echo "" >> security-report.md
+        echo "**Scan Date:** $(date)" >> security-report.md
+        echo "**Image:** ansible_docker-ansible-control:latest" >> security-report.md
+        echo "" >> security-report.md
+        echo "### Trivy Results" >> security-report.md
+        if [ -f "trivy-container-results.sarif" ]; then
+          echo "✅ Trivy scan completed" >> security-report.md
+        else
+          echo "❌ Trivy scan failed" >> security-report.md
+        fi
+        echo "" >> security-report.md
+        echo "### Grype Results" >> security-report.md
+        if [ -f "${{ steps.grype-scan.outputs.sarif }}" ]; then
+          echo "✅ Grype scan completed" >> security-report.md
+        else
+          echo "❌ Grype scan failed" >> security-report.md
+        fi
+    
+    - name: Upload Security Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-report
+        path: security-report.md
+        retention-days: 30
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        docker system prune -f

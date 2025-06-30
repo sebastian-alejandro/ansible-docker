@@ -1,0 +1,363 @@
+name: Phase 1 - Documentation Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'ansible-control/**'
+      - 'docker-compose.yml'
+      - '*.md'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'ansible-control/**'
+      - 'docker-compose.yml'
+      - '*.md'
+  workflow_dispatch:
+
+jobs:
+  documentation-validation:
+    name: Documentation Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Validate README Structure
+      run: |
+        echo "📚 Validating README.md structure..."
+        
+        # Verificar que README.md existe
+        if [ ! -f "README.md" ]; then
+          echo "❌ README.md not found"
+          exit 1
+        fi
+        
+        # Verificar secciones requeridas
+        REQUIRED_SECTIONS=(
+          "# "
+          "## Overview"
+          "## Prerequisites"
+          "## Quick Start"
+          "## Usage"
+          "## Configuration"
+          "## Troubleshooting"
+        )
+        
+        for section in "${REQUIRED_SECTIONS[@]}"; do
+          if grep -q "$section" README.md; then
+            echo "✅ Found section: $section"
+          else
+            echo "❌ Missing section: $section"
+            exit 1
+          fi
+        done
+        
+        echo "✅ README.md structure is valid"
+    
+    - name: Validate Documentation Links
+      run: |
+        echo "🔗 Validating documentation links..."
+        
+        # Buscar enlaces internos en archivos markdown
+        BROKEN_LINKS=0
+        
+        for md_file in $(find . -name "*.md" -type f); do
+          echo "Checking links in $md_file..."
+          
+          # Extraer enlaces relativos (que empiecen con ./ o ../ o sin protocolo)
+          LINKS=$(grep -oE '\[.*\]\([^)]+\)' "$md_file" | grep -oE '\([^)]+\)' | tr -d '()' | grep -E '^[^http]')
+          
+          for link in $LINKS; do
+            # Ignorar anclas
+            if [[ "$link" == "#"* ]]; then
+              continue
+            fi
+            
+            # Verificar si el archivo existe
+            LINK_PATH=$(dirname "$md_file")/"$link"
+            if [ ! -f "$LINK_PATH" ] && [ ! -d "$LINK_PATH" ]; then
+              echo "❌ Broken link in $md_file: $link"
+              BROKEN_LINKS=$((BROKEN_LINKS + 1))
+            else
+              echo "✅ Valid link: $link"
+            fi
+          done
+        done
+        
+        if [ $BROKEN_LINKS -gt 0 ]; then
+          echo "❌ Found $BROKEN_LINKS broken links"
+          exit 1
+        else
+          echo "✅ All documentation links are valid"
+        fi
+    
+    - name: Validate Code Examples
+      run: |
+        echo "💻 Validating code examples in documentation..."
+        
+        # Verificar que los ejemplos de docker-compose sean válidos
+        if grep -q "docker-compose" README.md; then
+          echo "✅ Found docker-compose examples"
+          
+          # Verificar comandos básicos mencionados
+          DOCKER_COMMANDS=(
+            "docker-compose build"
+            "docker-compose up"
+            "docker-compose down"
+          )
+          
+          for cmd in "${DOCKER_COMMANDS[@]}"; do
+            if grep -q "$cmd" README.md; then
+              echo "✅ Found command: $cmd"
+            else
+              echo "⚠️ Missing command example: $cmd"
+            fi
+          done
+        fi
+        
+        # Verificar ejemplos de Ansible
+        if grep -q "ansible" README.md; then
+          echo "✅ Found Ansible examples"
+        fi
+    
+    - name: Validate Technical Documentation
+      run: |
+        echo "🔧 Validating technical documentation..."
+        
+        # Verificar documentación técnica
+        TECH_DOCS=(
+          "docs/project-architecture.md"
+          "docs/technical-reference.md"
+        )
+        
+        for doc in "${TECH_DOCS[@]}"; do
+          if [ -f "$doc" ]; then
+            echo "✅ Found technical doc: $doc"
+            
+            # Verificar que contenga información sobre Phase 1
+            if grep -qi "phase.*1\|ansible.*control" "$doc"; then
+              echo "✅ $doc contains Phase 1 information"
+            else
+              echo "⚠️ $doc may be missing Phase 1 information"
+            fi
+          else
+            echo "⚠️ Technical doc not found: $doc"
+          fi
+        done
+    
+    - name: Check Documentation Completeness
+      run: |
+        echo "📋 Checking documentation completeness..."
+        
+        # Verificar que todos los scripts tengan documentación
+        SCRIPTS_DIR="ansible-control/scripts"
+        
+        if [ -d "$SCRIPTS_DIR" ]; then
+          for script in "$SCRIPTS_DIR"/*.sh; do
+            script_name=$(basename "$script")
+            
+            # Verificar si el script está mencionado en la documentación
+            if grep -r "$script_name" . --include="*.md" > /dev/null; then
+              echo "✅ Script documented: $script_name"
+            else
+              echo "⚠️ Script may need documentation: $script_name"
+            fi
+          done
+        fi
+        
+        # Verificar documentación de playbooks
+        PLAYBOOKS_DIR="ansible-control/playbooks"
+        
+        if [ -d "$PLAYBOOKS_DIR" ]; then
+          for playbook in "$PLAYBOOKS_DIR"/*.yml; do
+            playbook_name=$(basename "$playbook")
+            
+            if grep -r "$playbook_name" . --include="*.md" > /dev/null; then
+              echo "✅ Playbook documented: $playbook_name"
+            else
+              echo "⚠️ Playbook may need documentation: $playbook_name"
+            fi
+          done
+        fi
+    
+    - name: Validate Environment Documentation
+      run: |
+        echo "🌍 Validating environment documentation..."
+        
+        # Verificar que se documenten las variables de entorno
+        ENV_VARS=(
+          "ANSIBLE_USER"
+          "ANSIBLE_HOST_KEY_CHECKING"
+        )
+        
+        for var in "${ENV_VARS[@]}"; do
+          if grep -r "$var" . --include="*.md" > /dev/null; then
+            echo "✅ Environment variable documented: $var"
+          else
+            echo "⚠️ Environment variable may need documentation: $var"
+          fi
+        done
+        
+        # Verificar documentación de volúmenes
+        if grep -r "volumes:" docker-compose.yml > /dev/null; then
+          if grep -r "volume" . --include="*.md" > /dev/null; then
+            echo "✅ Volume configuration documented"
+          else
+            echo "⚠️ Volume configuration may need documentation"
+          fi
+        fi
+    
+    - name: Lint Markdown Files
+      uses: DavidAnson/markdownlint-cli2-action@v13
+      continue-on-error: true
+      with:
+        globs: |
+          **/*.md
+          !node_modules/**
+    
+    - name: Check for TODO/FIXME Comments
+      run: |
+        echo "🔍 Checking for TODO/FIXME comments in documentation..."
+        
+        TODO_COUNT=$(grep -r -i "todo\|fixme" . --include="*.md" | wc -l)
+        
+        if [ $TODO_COUNT -gt 0 ]; then
+          echo "⚠️ Found $TODO_COUNT TODO/FIXME comments:"
+          grep -r -i "todo\|fixme" . --include="*.md"
+          echo "Consider addressing these before Phase 1 completion"
+        else
+          echo "✅ No TODO/FIXME comments found"
+        fi
+    
+    - name: Validate Version Information
+      run: |
+        echo "📦 Validating version information..."
+        
+        # Verificar que se mencione la versión 1.3.0
+        if grep -r "1\.3\.0\|v1\.3\.0" . --include="*.md" > /dev/null; then
+          echo "✅ Version 1.3.0 mentioned in documentation"
+        else
+          echo "⚠️ Version 1.3.0 may need to be documented"
+        fi
+        
+        # Verificar changelog
+        if [ -f "CHANGELOG.md" ]; then
+          if grep -q "1\.3\.0\|v1\.3\.0" CHANGELOG.md; then
+            echo "✅ Version 1.3.0 found in CHANGELOG.md"
+          else
+            echo "⚠️ Version 1.3.0 may be missing from CHANGELOG.md"
+          fi
+        else
+          echo "⚠️ CHANGELOG.md not found"
+        fi
+
+  documentation-build:
+    name: Documentation Build Test
+    runs-on: ubuntu-latest
+    needs: documentation-validation
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Test Documentation Build (Simulation)
+      run: |
+        echo "🏗️ Testing documentation build process..."
+        
+        # Simular proceso de build de documentación
+        echo "Creating documentation site structure..."
+        mkdir -p docs-build
+        
+        # Convertir markdown a html (simulación)
+        for md_file in $(find . -name "*.md" -type f); do
+          echo "Processing $md_file..."
+          # En un build real, aquí usarías herramientas como pandoc, mkdocs, etc.
+          touch "docs-build/$(basename $md_file .md).html"
+        done
+        
+        echo "✅ Documentation build simulation completed"
+        echo "📁 Generated files:"
+        ls -la docs-build/
+    
+    - name: Generate Documentation Index
+      run: |
+        echo "📖 Generating documentation index..."
+        
+        cat > docs-build/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Ansible Docker Project - Phase 1 Documentation</title>
+        </head>
+        <body>
+            <h1>Ansible Docker Project Documentation</h1>
+            <h2>Phase 1 - Ansible Control Node</h2>
+            <ul>
+                <li><a href="README.html">Project README</a></li>
+                <li><a href="project-architecture.html">Architecture Overview</a></li>
+                <li><a href="technical-reference.html">Technical Reference</a></li>
+                <li><a href="CHANGELOG.html">Change Log</a></li>
+            </ul>
+        </body>
+        </html>
+        EOF
+        
+        echo "✅ Documentation index generated"
+    
+    - name: Upload Documentation Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation-build
+        path: docs-build/
+        retention-days: 7
+
+  documentation-report:
+    name: Documentation Report
+    runs-on: ubuntu-latest
+    needs: [documentation-validation, documentation-build]
+    if: always()
+    
+    steps:
+    - name: Generate Documentation Report
+      run: |
+        echo "📊 Documentation Test Results" > documentation-report.md
+        echo "============================" >> documentation-report.md
+        echo "" >> documentation-report.md
+        echo "**Test Date:** $(date)" >> documentation-report.md
+        echo "**Phase:** 1 - Ansible Control Node" >> documentation-report.md
+        echo "" >> documentation-report.md
+        echo "### Test Results" >> documentation-report.md
+        echo "- ✅ Documentation Validation: ${{ needs.documentation-validation.result }}" >> documentation-report.md
+        echo "- ✅ Documentation Build: ${{ needs.documentation-build.result }}" >> documentation-report.md
+        echo "" >> documentation-report.md
+        echo "### Recommendations" >> documentation-report.md
+        echo "- Keep documentation updated with code changes" >> documentation-report.md
+        echo "- Review and address any TODO/FIXME comments" >> documentation-report.md
+        echo "- Ensure all scripts and playbooks are documented" >> documentation-report.md
+        echo "- Update version information consistently" >> documentation-report.md
+        echo "" >> documentation-report.md
+        
+        if [[ "${{ needs.documentation-validation.result }}" == "success" && \
+              "${{ needs.documentation-build.result }}" == "success" ]]; then
+          echo "🎉 **Documentation Status: READY**" >> documentation-report.md
+        else
+          echo "❌ **Documentation Status: NEEDS ATTENTION**" >> documentation-report.md
+        fi
+    
+    - name: Upload Documentation Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation-report
+        path: documentation-report.md
+        retention-days: 30
