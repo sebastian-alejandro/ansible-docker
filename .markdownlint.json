@@ -1,0 +1,38 @@
+{
+  "default": true,
+  "line-length": {
+    "line_length": 120,
+    "heading_line_length": 80,
+    "code_block_line_length": 120,
+    "tables": false
+  },
+  "no-trailing-spaces": true,
+  "no-hard-tabs": true,
+  "no-reversed-links": true,
+  "no-multiple-blanks": {
+    "maximum": 2
+  },
+  "blanks-around-headers": {
+    "lines_above": 1,
+    "lines_below": 1
+  },
+  "header-increment": true,
+  "no-duplicate-header": {
+    "siblings_only": true
+  },
+  "ul-style": {
+    "style": "dash"
+  },
+  "ol-prefix": {
+    "style": "ordered"
+  },
+  "no-inline-html": {
+    "allowed_elements": ["br", "img", "details", "summary", "sup", "sub"]
+  },
+  "fenced-code-language": true,
+  "first-line-h1": false,
+  "no-emphasis-as-header": false,
+  "code-block-style": {
+    "style": "fenced"
+  }
+}

@@ -1,0 +1,85 @@
+---
+# YAML Lint Configuration for Ansible Docker Project
+# This configuration is optimized for Ansible playbooks and Docker Compose files
+
+extends: default
+
+rules:
+  # Line length - be more lenient for Docker and Ansible files
+  line-length:
+    max: 120
+    level: warning
+  
+  # Indentation - standard 2 spaces
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+  
+  # Comments - require space after #
+  comments:
+    min-spaces-from-content: 1
+  
+  # Document start - not required for all files
+  document-start:
+    present: false
+  
+  # Truthy values - be lenient with Ansible
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: true
+  
+  # Brackets - consistent spacing
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+  
+  # Braces - consistent spacing
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+  
+  # Colons - standard formatting
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+  
+  # Commas - standard formatting
+  commas:
+    max-spaces-before: 0
+    max-spaces-after: 1
+  
+  # Empty lines - be somewhat lenient
+  empty-lines:
+    max: 2
+    max-start: 1
+    max-end: 1
+  
+  # Key duplicates - not allowed
+  key-duplicates: enable
+  
+  # Quoted strings - be lenient
+  quoted-strings:
+    quote-type: any
+    required: false
+  
+  # Trailing spaces - not allowed
+  trailing-spaces: enable
+  
+  # Float values - allow different formats
+  float-values:
+    require-numeral-before-decimal: false
+    forbid-scientific-notation: false
+    forbid-nan: true
+    forbid-inf: true
+
+# Ignore patterns for files that don't need strict linting
+ignore: |
+  .git/
+  .github/
+  node_modules/
+  *.md
+  # Ignore generated or temporary files
+  .yamllint
+  # Ignore files with known issues that can't be easily fixed
+  centos9/Dockerfile
