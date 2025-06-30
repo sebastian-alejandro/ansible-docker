@@ -1,185 +1,161 @@
-# 🤝 Contributing to Ansible Docker Environment
+# Contributing Guidelines
 
-¡Gracias por tu interés en contribuir al proyecto! Esta guía te ayudará a comenzar.
+## Overview
 
-## 📋 Cómo Contribuir
+Contributions to the Ansible Docker Environment project are welcome. Please follow these guidelines to ensure consistent code quality and project standards.
 
-### 🐛 Reportar Bugs
-1. Verifica que el bug no haya sido reportado previamente
-2. Usa el template de [Bug Report](.github/ISSUE_TEMPLATE/bug_report.md)
-3. Incluye información detallada del ambiente y logs
-4. Ejecuta `.\manage.ps1 test` antes de reportar
+## How to Contribute
 
-### ✨ Sugerir Funcionalidades
-1. Usa el template de [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md)
-2. Explica claramente el problema que resuelve
-3. Proporciona ejemplos de uso
-4. Considera el impacto en la arquitectura existente
+### Bug Reports
+1. Check existing issues before creating new ones
+2. Use the bug report template
+3. Include environment details and logs
+4. Provide steps to reproduce the issue
 
-### 🔧 Enviar Pull Requests
-1. Fork del repositorio
-2. Crear rama de feature desde `main`
-3. Seguir los estándares de código
-4. Agregar tests apropiados
-5. Actualizar documentación
-6. Enviar Pull Request
+### Feature Requests
+1. Use the feature request template
+2. Clearly describe the problem being solved
+3. Provide use case examples
+4. Consider impact on existing architecture
 
-## 🏗️ Estructura del Proyecto
+### Pull Requests
+1. Fork the repository
+2. Create feature branch from `main`
+3. Follow coding standards
+4. Add appropriate tests
+5. Update documentation
+6. Submit pull request
+
+## Project Structure
 
 ```
 ansible_docker/
-├── centos9/                    # Container CentOS 9
-├── ansible-control/            # Container Ansible (futuro)
-├── docs/                       # Documentación por Sprint
-├── .github/                    # Templates y workflows
-├── docker-compose.yml          # Orquestación
-└── manage.ps1                  # Scripts de gestión
+├── centos9/                    # CentOS 9 container
+├── ansible-control/            # Ansible control container
+├── docs/                       # Documentation
+├── .github/                    # CI/CD workflows
+├── docker-compose.yml          # Service orchestration
+└── manage-sprint2.sh           # Management scripts
 ```
 
-## 📝 Estándares de Código
+## Development Standards
 
 ### Dockerfiles
-- Usar multi-stage builds cuando sea posible
-- Comentarios descriptivos en español
-- Optimizar capas y tamaño de imagen
-- Incluir health checks
-- Seguir mejores prácticas de seguridad
+- Use multi-stage builds when applicable
+- Include descriptive comments
+- Optimize layers and image size
+- Include health checks
+- Follow security best practices
 
-### Scripts PowerShell
-- Funciones con nombres descriptivos
-- Comentarios explicativos
-- Manejo de errores apropiado
-- Validación de parámetros
-- Seguir PSScriptAnalyzer rules
+### Shell Scripts
+- Use descriptive function names
+- Include error handling
+- Add usage documentation
+- Follow POSIX compliance when possible
 
 ### Docker Compose
-- Usar versión 3.8+
-- Comentarios por sección
-- Variables de entorno documentadas
-- Redes y volúmenes nombrados apropiadamente
+- Use version 3.8+ format
+- Include health checks
+- Define explicit networks
+- Use environment variables for configuration
 
-### Documentación
-- Formato Markdown
-- Emojis para mejor legibilidad
-- Ejemplos prácticos
-- Troubleshooting actualizado
-- Links internos funcionales
+### Documentation
+- Use clear, concise technical language
+- Include code examples
+- Update version numbers appropriately
+- Maintain consistent formatting
 
-## 🧪 Testing
+## Testing Requirements
 
-### Antes de enviar PR:
-```powershell
-# Construir y probar localmente
-.\manage.ps1 build
-.\manage.ps1 start
-.\manage.ps1 test
+### Functional Tests
+```bash
+# Run test suite
+python3 test_functional_ci.py
 
-# Verificar logs
-.\manage.ps1 logs
-
-# Limpiar ambiente
-.\manage.ps1 clean
+# Manual verification
+docker compose up -d
+docker compose ps
 ```
 
 ### CI/CD Pipeline
-- Lint de Dockerfiles con Hadolint
-- Validación de Docker Compose
-- Análisis de PowerShell scripts
-- Tests de integración automáticos
+- All tests must pass in GitHub Actions
+- Include both unit and integration tests
+- Verify cross-platform compatibility
 
-## 📚 Desarrollo por Sprints
+### Security Testing
+- Container security scanning
+- SSH configuration validation
+- Network isolation verification
 
-### Sprint Actual: 1/5 ✅
-- CentOS 9 base implementation
+## Code Review Process
 
-### Próximos Sprints:
-- **Sprint 2:** Ansible Control Node
-- **Sprint 3:** Orquestación avanzada
-- **Sprint 4:** Playbooks y automatización  
-- **Sprint 5:** Monitoreo y optimización
+1. **Automated Checks**: All CI/CD tests must pass
+2. **Peer Review**: At least one approval required
+3. **Documentation**: Updates must include relevant docs
+4. **Testing**: New features require test coverage
 
-## 🔄 Workflow de Git
-
-### Ramas
-- `main` - Código estable en producción
-- `develop` - Desarrollo activo
-- `feature/nombre-feature` - Nuevas funcionalidades
-- `hotfix/nombre-fix` - Correcciones urgentes
-
-### Commits
-Usar [Conventional Commits](https://www.conventionalcommits.org/):
+## Commit Message Format
 
 ```
-tipo(scope): descripción
+type(scope): description
 
-feat(docker): agregar health check to centos9 container
-fix(scripts): corregir issue con permisos SSH
-docs(readme): actualizar guía de instalación
+- Use imperative mood
+- Keep first line under 50 characters
+- Include detailed explanation if needed
 ```
 
-### Tags de Versión
-- `v1.0.0` - Sprint 1 completion
-- `v1.1.0` - Sprint 2 completion
-- `v2.0.0` - Major architecture changes
+Examples:
+```
+fix(docker): resolve netcat package installation
+feat(ansible): add control node configuration
+docs(readme): update installation instructions
+```
 
-## 🎯 Issues y Labels
+## Branch Naming
 
-### Labels de Issues:
-- `bug` - Reportes de bugs
-- `enhancement` - Mejoras
-- `feature-request` - Nuevas funcionalidades
-- `documentation` - Mejoras en documentación
-- `sprint-2`, `sprint-3`, etc. - Por sprint
-- `good-first-issue` - Para nuevos contribuidores
-- `help-wanted` - Necesita ayuda de la comunidad
+- `feature/description` - New features
+- `fix/description` - Bug fixes
+- `docs/description` - Documentation updates
+- `refactor/description` - Code refactoring
 
-## 📞 Comunicación
+## Version Management
 
-### Canales:
-- **GitHub Issues** - Bugs y feature requests
-- **GitHub Discussions** - Preguntas generales
-- **Pull Requests** - Revisión de código
+- Follow semantic versioning (MAJOR.MINOR.PATCH)
+- Update CHANGELOG.md for all releases
+- Tag releases in git
+- Update version badges in README
 
-### Tiempos de Respuesta:
-- Issues: 24-48 horas
-- Pull Requests: 2-5 días
-- Preguntas: 24 horas
+## Environment Setup
 
-## ⚖️ Código de Conducta
+### Development Requirements
+- Docker Engine 20.10+
+- Docker Compose v2.0+
+- Git 2.30+
+- Python 3.8+ (for testing)
 
-### Nuestros Compromisos:
-- Ser inclusivos y respetuosos
-- Aceptar críticas constructivas
-- Focalizarse en lo mejor para la comunidad
-- Mostrar empatía hacia otros miembros
+### Local Development
+```bash
+# Clone repository
+git clone https://github.com/sebastian-alejandro/ansible-docker.git
+cd ansible-docker
 
-### Comportamientos No Aceptados:
-- Lenguaje o imágenes sexualizadas
-- Trolling, insultos o ataques personales
-- Acoso público o privado
-- Publicar información privada sin permiso
+# Start development environment
+docker compose up -d
 
-## 🏆 Reconocimientos
+# Run tests
+python3 test_functional_ci.py
+```
 
-Los contribuidores serán reconocidos en:
-- README.md del proyecto
-- Releases notes
-- Changelog del proyecto
+## Issue Templates
 
-### Tipos de Contribuciones:
-- 💻 Código
-- 📖 Documentación
-- 🐛 Bug reports
-- 💡 Ideas y sugerencias
-- 🎨 Diseño
-- 📋 Project management
+Use the provided issue templates:
+- [Bug Report](.github/ISSUE_TEMPLATE/bug_report.md)
+- [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md)
 
-## 📄 Licencia
+## License
 
-Al contribuir, aceptas que tus contribuciones serán licenciadas bajo la misma licencia MIT del proyecto.
+By contributing, you agree that your contributions will be licensed under the MIT License.
 
----
+## Questions
 
-**¿Preguntas?** Abre un [GitHub Discussion](https://github.com/sebastian-alejandro/ansible-docker/discussions) o crea un issue.
-
-¡Esperamos tus contribuciones! 🚀
+For questions about contributing, please open an issue with the "question" label.

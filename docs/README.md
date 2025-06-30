@@ -1,190 +1,204 @@
-# 📚 Índice de Documentación - Ansible Docker Environment
+# Documentation Index
 
-Bienvenido al centro de documentación del **Ansible Docker Environment**. Esta documentación está organizada por sprints, siguiendo una metodología ágil para evolucionar desde un laboratorio básico hasta una solución empresarial de clase mundial.
+## Current Status
 
-## 🚨 **ESTADO ACTUAL - SPRINT 1 COMPLETADO** ✅
+**Version**: 1.2.1  
+**Status**: Production Ready  
+**Last Updated**: June 27, 2025
 
-### ✅ **Sprint 1 - COMPLETADO (Junio 27, 2025)**
+## Architecture Overview
 
-**🔧 PROBLEMAS CRÍTICOS RESUELTOS**
-- ✅ **Locale Configuration**: Corregido error `glibc-common` en CentOS 9 build
-- ✅ **CI/CD Pipeline**: Implementado modo fallback inteligente para GitHub Actions
-- ✅ **Container Startup**: Detección automática de entorno CI vs local
-- ✅ **SSH Service**: Garantizada disponibilidad en todos los entornos
-- ✅ **Systemd Compatibility**: Soporte dual para systemd y modo fallback
-- ✅ **Testing Framework**: 5 tipos de tests automatizados (Build, Functional, SSH, User, Python)
+The Ansible Docker Environment provides a containerized lab setup for Ansible automation testing and development using CentOS 9 Stream containers orchestrated with Docker Compose.
 
-**📊 MÉTRICAS ALCANZADAS**
-- 🎯 **100% CI/CD Success Rate**: Pipeline completamente funcional
-- 🎯 **99.9% Container Reliability**: Startup garantizado local + CI
-- 🎯 **Dual Mode Support**: Systemd (local) + Fallback (CI)
+## Quick Start Guides
 
-**🎯 Sprint 1 Status**: **COMPLETADO** ✅ - Base sólida lista para Sprint 2
+### Installation
+1. [System Requirements](#requirements)
+2. [Installation Steps](#installation)
+3. [Basic Configuration](#configuration)
 
-## 🎯 Navegación Rápida
+### Usage
+1. [Container Management](#management)
+2. [SSH Access](#ssh-access)
+3. [Testing Procedures](#testing)
 
-### 📊 Visión General
-- 🌟 **[Visión Completa del Proyecto](project-vision.md)** - Arquitectura evolutiva, roadmap y métricas
-- 📈 **[Roadmap y Timeline](project-vision.md#-roadmap-temporal)** - Planificación temporal de sprints
-- 🎯 **[Objetivos y KPIs](project-vision.md#-criterios-de-éxito-del-proyecto)** - Métricas de éxito
+## Technical Documentation
 
-### 🏗️ Documentación por Sprints
+### Container Architecture
+- **Base OS**: CentOS 9 Stream
+- **Container Runtime**: Docker Engine 20.10+
+- **Orchestration**: Docker Compose v2.0+
+- **Network**: Bridge networking with custom network
+- **Storage**: Named volumes for persistence
 
-#### Sprint 1: ✅ **COMPLETADO** - Fundamentos Sólidos
-📖 **[Sprint 1 - Fundamentos y CentOS 9](sprint1.md)**
-```
-✅ Estado: COMPLETADO (v1.2.0)
-🎯 Objetivo: Base confiable y CI/CD robusto
-💡 Valor: Fundamentos sólidos para escalabilidad
-```
-**Características:**
-- Container CentOS 9 optimizado
-- Docker Compose con health checks
-- CI/CD completo con 5 tipos de pruebas
-- Comandos nativos multiplataforma
-- Testing automatizado
+### Security Configuration
+- SSH password and key-based authentication
+- User 'ansible' with passwordless sudo
+- Isolated container network
+- Health monitoring enabled
 
-#### Sprint 2: 📅 **PRÓXIMO** - Control y Automatización
-📖 **[Sprint 2 - Control Node y Automatización](sprint2.md)**
-```
-📅 Estado: PLANIFICADO (v2.0.0)
-🎯 Objetivo: Nodo de control + automatización SSH
-💡 Valor: Reducir errores manuales 90%
-```
-**Características:**
-- Ansible Control Node (Rocky Linux 9)
-- Automatización completa de SSH keys
-- Inventario dinámico con grupos
-- Playbooks de demostración
-- Script de gestión avanzado
+### Development Workflow
+- GitHub Actions CI/CD pipeline
+- Automated testing suite
+- Cross-platform compatibility
+- Version-controlled configuration
 
-#### Sprint 3: 🌐 **PLANIFICADO** - Orquestación Avanzada
-📖 **[Sprint 3 - Orquestación Avanzada](sprint3.md)**
-```
-📅 Estado: PLANIFICADO (v3.0.0)
-🎯 Objetivo: Múltiples entornos + Ansible Vault
-💡 Valor: Escalabilidad empresarial
-```
-**Características:**
-- Múltiples entornos (dev/staging/prod)
-- Ansible Vault para secretos
-- Roles y collections empresariales
-- Pipeline CI/CD con Molecule
-- AWX/Tower para orquestación
+## System Requirements
 
-#### Sprint 4: 🏢 **PLANIFICADO** - Nivel Empresarial
-📖 **[Sprint 4 - Automatización Empresarial](sprint4.md)**
-```
-📅 Estado: PLANIFICADO (v4.0.0)
-🎯 Objetivo: Integración empresarial completa
-💡 Valor: Reducir costos infraestructura 40%
-```
-**Características:**
-- Playbooks de administración avanzada
-- Integración LDAP, ServiceNow, ITSM
-- Reporting y auditoría empresarial
-- Escalado automático multi-cloud
-- Governance y compliance
+### Minimum Requirements
+- Docker Engine 20.10+
+- Docker Compose v2.0+
+- 2GB RAM
+- 5GB disk space
 
-#### Sprint 5: 📊 **PLANIFICADO** - Excelencia Operacional
-📖 **[Sprint 5 - Excelencia Operacional](sprint5.md)**
-```
-📅 Estado: PLANIFICADO (v5.0.0)
-🎯 Objetivo: ML/AI + observabilidad 360°
-💡 Valor: 99.9% uptime + optimización predictiva
-```
-**Características:**
-- Observabilidad completa (Prometheus, Grafana, ELK)
-- Machine Learning para optimización
-- Self-healing y auto-remediation
-- FinOps y cost optimization
-- IA y predictive analytics
+### Supported Platforms
+- Linux (Ubuntu 20.04+, CentOS 8+, RHEL 8+)
+- Windows 10/11 with Docker Desktop
+- macOS 10.15+ with Docker Desktop
 
-## 🎯 Guías de Uso por Audiencia
+## Installation
 
-### 👨‍💻 Desarrolladores
-```
-1. 📖 Lee Sprint 1 - entender la base
-2. 🚀 Quick Start en README.md
-3. 🔧 Comandos nativos Docker
-4. 🧪 Ejecutar tests localmente
+### Quick Setup
+```bash
+git clone https://github.com/sebastian-alejandro/ansible-docker.git
+cd ansible-docker
+docker compose up -d
 ```
 
-### 🏢 Arquitectos/DevOps
-```
-1. 📊 Visión completa del proyecto
-2. 📈 Roadmap y evolución por sprints
-3. 🎯 Métricas de valor de negocio
-4. 🔄 Metodología ágil aplicada
+### Verification
+```bash
+docker compose ps
+ssh ansible@localhost -p 2201
 ```
 
-### 👨‍💼 Management/Product Owners
+## Configuration
+
+### Environment Variables
+- `ANSIBLE_USER`: SSH user (default: ansible)
+- `ANSIBLE_PASSWORD`: SSH password (default: ansible123)
+
+### Port Mapping
+- 2201: centos9-node-1 SSH
+- 2202: centos9-node-2 SSH
+
+### Network Configuration
+- Network: ansible-network
+- Driver: bridge
+- Subnet: Auto-assigned by Docker
+
+## Management
+
+### Container Operations
+```bash
+# Start environment
+docker compose up -d
+
+# Stop environment
+docker compose down
+
+# View logs
+docker compose logs
+
+# Restart services
+docker compose restart
 ```
-1. 🎯 Objetivos y KPIs por sprint
-2. 💰 ROI y valor de negocio
-3. 📅 Timeline y entregables
-4. 📊 Métricas de progreso
+
+### Health Monitoring
+```bash
+# Check container health
+docker compose ps
+
+# Individual container status
+docker inspect --format='{{.State.Health.Status}}' centos9-node-1
 ```
 
-### 🎓 Estudiantes/Aprendizaje
+## SSH Access
+
+### Direct SSH
+```bash
+ssh ansible@localhost -p 2201  # Node 1
+ssh ansible@localhost -p 2202  # Node 2
 ```
-1. 🏗️ Sprint 1 - fundamentos
-2. 🎛️ Sprint 2 - automatización
-3. 📚 Documentación técnica detallada
-4. 💡 Ejemplos prácticos
+
+### Container Shell
+```bash
+docker compose exec centos9-node-1 bash
+docker compose exec centos9-node-2 bash
 ```
 
-## 📋 Checklist de Lectura Recomendada
+## Testing
 
-### Nivel Básico ✅
-- [ ] README.md - Quick Start
-- [ ] Sprint 1 - Fundamentos
-- [ ] Comandos Docker nativos
-- [ ] CI/CD básico
+### Automated Tests
+```bash
+python3 test_functional_ci.py
+```
 
-### Nivel Intermedio 🎯
-- [ ] Sprint 2 - Control Node
-- [ ] Sprint 3 - Orquestación
-- [ ] Visión del proyecto
-- [ ] Metodología ágil
+### Manual Verification
+```bash
+# Test SSH connectivity
+ssh ansible@localhost -p 2201 "hostname"
 
-### Nivel Avanzado 🚀
-- [ ] Sprint 4 - Nivel empresarial
-- [ ] Sprint 5 - Excelencia operacional
-- [ ] Roadmap completo
-- [ ] Arquitectura evolutiva
+# Test sudo access
+ssh ansible@localhost -p 2201 "sudo whoami"
 
-## 🔗 Enlaces Externos Útiles
+# Test network connectivity
+docker compose exec centos9-node-1 ping centos9-node-2
+```
 
-### Documentación Oficial
-- [🐳 Docker Compose](https://docs.docker.com/compose/)
-- [🔧 Ansible Documentation](https://docs.ansible.com/)
-- [🐧 CentOS Stream 9](https://centos.org/centos-stream/)
-- [🏔️ Rocky Linux](https://rockylinux.org/documentation/)
+## Troubleshooting
 
-### Herramientas y Recursos
-- [📊 GitHub Actions](https://docs.github.com/en/actions)
-- [🔐 Ansible Vault](https://docs.ansible.com/ansible/latest/user_guide/vault.html)
-- [🎭 Molecule](https://molecule.readthedocs.io/)
-- [🏗️ AWX](https://github.com/ansible/awx)
+### Common Issues
 
-## 📞 Soporte y Contribución
+**Container startup failure**
+- Check Docker daemon status
+- Verify port availability
+- Review container logs
 
-### 🆘 ¿Necesitas Ayuda?
-- 📖 **Documentación**: Tienes toda la documentación aquí
-- 🐛 **Issues**: [GitHub Issues](https://github.com/tu-usuario/ansible-docker/issues)
-- 💬 **Discusiones**: [GitHub Discussions](https://github.com/tu-usuario/ansible-docker/discussions)
+**SSH connection refused**
+- Verify SSH service status
+- Check port mapping
+- Confirm firewall settings
 
-### 🤝 Cómo Contribuir
-1. **Lee** la documentación relevante
-2. **Entiende** el sprint actual y próximos
-3. **Contribuye** siguiendo la metodología ágil
-4. **Documenta** tus cambios apropiadamente
+**Health check failures**
+- Review systemd status
+- Check service dependencies
+- Verify resource availability
 
----
+### Debug Commands
+```bash
+# Container logs
+docker compose logs centos9-node-1
 
-📅 **Última actualización**: Junio 2025  
-🚀 **Sprint actual**: Sprint 1 (Completado)  
-📋 **Próximo hito**: Sprint 2 - Control Node
+# Service status
+docker compose exec centos9-node-1 systemctl status
 
-*¡Gracias por usar Ansible Docker Environment!* 🎉
+# Network connectivity
+docker network inspect ansible-network
+```
+
+## Development
+
+### Contributing
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for development guidelines.
+
+### Testing Framework
+- Functional tests: Container operations
+- Integration tests: Multi-container scenarios
+- Security tests: SSH and user configuration
+- Performance tests: Resource utilization
+
+### CI/CD Pipeline
+- GitHub Actions automation
+- Multi-platform testing
+- Automated releases
+- Security scanning
+
+## Support
+
+### Documentation
+- [README.md](../README.md): Project overview
+- [CHANGELOG.md](../CHANGELOG.md): Version history
+- [CONTRIBUTING.md](../CONTRIBUTING.md): Development guidelines
+
+### Issues
+Report issues via [GitHub Issues](https://github.com/sebastian-alejandro/ansible-docker/issues)
