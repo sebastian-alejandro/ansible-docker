@@ -209,6 +209,7 @@ Report issues via [GitHub Issues](https://github.com/sebastian-alejandro/ansible
 - [Project Architecture](project-architecture.md): Technical architecture and development roadmap
 - [Technical Reference](technical-reference.md): Docker commands and development guides  
 - [Release Notes](release-notes.md): Current version features and specifications
+- [Development Plan v1.3.0](development-plan-v1.3.0.md): Detailed implementation plan for Ansible Control Node
 
 ### Troubleshooting
 - [CI/CD Fixes Report](ci-cd-fixes-report.md): Historical issues and solutions
