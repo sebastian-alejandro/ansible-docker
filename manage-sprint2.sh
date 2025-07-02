@@ -111,9 +111,13 @@ test_connectivity() {
 }
 
 run_playbook() {
-    local playbook=${1:-"ping.yml"}
-    log "📚 Ejecutando playbook: $playbook"
-    docker compose exec ansible-control ansible-playbook -i inventory/hosts playbooks/$playbook
+    read -p "Enter playbook name (e.g., setup-webservers.yml): " playbook
+    if [ -z "$playbook" ]; then
+        echo "No playbook specified."
+        return
+    fi
+    echo "Running playbook: $playbook..."
+    docker compose exec ansible-control ansible-playbook -i inventory/hosts playbooks/"$playbook"
 }
 
 show_inventory() {
@@ -129,7 +133,12 @@ distribute_keys() {
 show_logs() {
     local service=${1:-"ansible-control"}
     log "📝 Mostrando logs de $service..."
-    docker compose logs --tail=50 -f $service
+    if [ -z "$service" ]; then
+        echo "No service specified."
+        return
+    fi
+    echo "Viewing logs for $service..."
+    docker compose logs --tail=50 -f "$service"
 }
 
 cleanup() {
@@ -147,15 +156,18 @@ build_images() {
 
 backup_data() {
     log "💾 Creando backup de volúmenes..."
-    local backup_dir="backup-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p $backup_dir
-    
-    # Backup de volúmenes importantes
-    docker run --rm -v ansible_control_ssh:/data -v $(pwd)/$backup_dir:/backup alpine tar czf /backup/control-ssh.tar.gz -C /data .
-    docker run --rm -v ansible_playbooks:/data -v $(pwd)/$backup_dir:/backup alpine tar czf /backup/playbooks.tar.gz -C /data .
-    docker run --rm -v ansible_inventory:/data -v $(pwd)/$backup_dir:/backup alpine tar czf /backup/inventory.tar.gz -C /data .
-    
-    success "Backup creado en: $backup_dir"
+    local backup_dir
+    backup_dir="backup-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$backup_dir"
+
+    echo "Backing up ansible_control_ssh volume..."
+    docker run --rm -v ansible_control_ssh:/data -v "$(pwd)/$backup_dir":/backup alpine tar czf /backup/control-ssh.tar.gz -C /data .
+    echo "Backing up ansible_playbooks volume..."
+    docker run --rm -v ansible_playbooks:/data -v "$(pwd)/$backup_dir":/backup alpine tar czf /backup/playbooks.tar.gz -C /data .
+    echo "Backing up ansible_inventory volume..."
+    docker run --rm -v ansible_inventory:/data -v "$(pwd)/$backup_dir":/backup alpine tar czf /backup/inventory.tar.gz -C /data .
+
+    echo "Backup completed in directory: $backup_dir"
 }
 
 # Función de ayuda

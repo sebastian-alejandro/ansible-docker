@@ -44,8 +44,8 @@ chmod 644 /etc/ssh/ssh_host_*_key.pub
 # Configurar timezone (opcional)
 if [ -n "$TZ" ]; then
     log "Configurando timezone: $TZ"
-    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime
-    echo $TZ > /etc/timezone
+    ln -snf "/usr/share/zoneinfo/$TZ" /etc/localtime
+    echo "$TZ" > /etc/timezone
 fi
 
 # Configurar hostname si se proporciona
@@ -82,7 +82,7 @@ if command -v systemctl &> /dev/null; then
     for service in sshd crond; do
         log "Iniciando $service..."
         for i in {1..5}; do
-            if systemctl start $service 2>/dev/null; then
+            if systemctl start "$service" 2>/dev/null; then
                 log "$service iniciado correctamente"
                 break
             else

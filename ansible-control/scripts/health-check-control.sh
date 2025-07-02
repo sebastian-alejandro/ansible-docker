@@ -11,7 +11,7 @@ log() {
 # Función para verificar servicios
 check_service() {
     local service=$1
-    if systemctl is-active --quiet $service; then
+    if systemctl is-active --quiet "$service"; then
         log "✅ Servicio $service está ejecutándose"
         return 0
     else
@@ -24,7 +24,7 @@ check_service() {
 check_command() {
     local cmd=$1
     local description=$2
-    if command -v $cmd > /dev/null 2>&1; then
+    if command -v "$cmd" > /dev/null 2>&1; then
         log "✅ $description disponible"
         return 0
     else

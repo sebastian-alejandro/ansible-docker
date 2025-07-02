@@ -12,68 +12,59 @@ log() {
 log "🔐 Iniciando distribución de claves SSH v1.3.0..."
 
 # Lista de nodos managed según especificaciones v1.3.0
-MANAGED_NODES=("centos9-node-1" "centos9-node-2")
-SSH_PASSWORD="ansible123"
+NODES=("centos9-node-1" "centos9-node-2")
+TEMP_PASSWORD="ansible123"
+MAX_RETRIES=5
+RETRY_DELAY=10
 
-for node in "${MANAGED_NODES[@]}"; do
-    log "🎯 Distribuyendo clave SSH a $node..."
-    
-    # Wait for node to be ready
-    until nc -z $node 22; do
-        log "⏳ Esperando servicio SSH de $node..."
-        sleep 5
-    done
-    
-    # Copy SSH key
-    sshpass -p "$SSH_PASSWORD" ssh-copy-id \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        ansible@$node
-    
-    if [ $? -eq 0 ]; then
-        log "✅ Clave SSH distribuida a $node"
-    else
-        log "❌ Falló distribución de clave SSH a $node"
-    fi
-done
+# Función para distribuir la clave a un solo nodo
+distribute_key_to_node() {
+    local node=$1
+    local max_retries=$MAX_RETRIES
+    local retry_delay=$RETRY_DELAY
+    local retry_count=0
 
-log "✅ Distribución de claves SSH completada"
+    log "🎯 Procesando nodo: $node"
+
+    # 1. Esperar a que el nodo esté disponible
+    while [ "$retry_count" -lt "$max_retries" ]; do
+        if nc -z "$node" 22; then
             log "✅ $node está disponible"
             break
         else
             retry_count=$((retry_count + 1))
             log "⏳ Esperando a que $node esté disponible ($retry_count/$max_retries)..."
-            sleep $retry_delay
+            sleep "$retry_delay"
         fi
     done
-    
-    if [ $retry_count -eq $max_retries ]; then
+
+    if [ "$retry_count" -eq "$max_retries" ]; then
         log "❌ $node no está disponible después de $max_retries intentos"
         return 1
     fi
-    
-    # Intentar distribución de clave con sshpass
+
+    # 2. Intentar distribución de clave con sshpass
     retry_count=0
-    while [ $retry_count -lt $max_retries ]; do
-        if sshpass -p "$TEMP_PASSWORD" ssh-copy-id -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ansible@$node 2>/dev/null; then
+    while [ "$retry_count" -lt "$max_retries" ]; do
+        if sshpass -p "$TEMP_PASSWORD" ssh-copy-id -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "ansible@$node" 2>/dev/null; then
             log "✅ Clave distribuida exitosamente a $node"
-            
-            # Verificar conectividad SSH sin contraseña
-            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 ansible@$node "echo 'SSH OK'" 2>/dev/null; then
+
+            # 3. Verificar conectividad SSH sin contraseña
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 "ansible@$node" "echo 'SSH OK'" 2>/dev/null; then
                 log "✅ Conectividad SSH sin contraseña verificada para $node"
                 return 0
             else
                 log "⚠️ Advertencia: Clave distribuida pero verificación SSH falló para $node"
-                return 1
+                return 1 # Considerar esto un fallo
             fi
         else
             retry_count=$((retry_count + 1))
             log "⚠️ Intento $retry_count/$max_retries falló para $node, reintentando en $retry_delay segundos..."
-            sleep $retry_delay
+            sleep "$retry_delay"
         fi
     done
-    
-    log "❌ Failed to distribute key to $node after $max_retries attempts"
+
+    log "❌ Falló la distribución de la clave a $node después de $max_retries intentos"
     return 1
 }
 
@@ -98,30 +89,20 @@ log "📋 Total de nodos: ${#NODES[@]}"
 # Test de conectividad final
 log "🧪 Ejecutando test de conectividad final..."
 if command -v ansible > /dev/null 2>&1; then
-    # Test con Ansible
-    log "🔧 Ejecutando test con Ansible..."
-    cd /home/ansible
-    if ansible all -i inventory/hosts -m ping --one-line 2>/dev/null; then
-        log "✅ Test de conectividad Ansible exitoso"
+    if su - ansible -c "ansible all -i /home/ansible/inventory/hosts -m ping"; then
+        log "🎉 Test de conectividad final con Ansible exitoso"
     else
-        log "⚠️ Test de conectividad Ansible falló - algunos nodos pueden no estar disponibles"
+        log "❌ Falló el test de conectividad final con Ansible"
     fi
 else
-    # Test manual con SSH
-    log "🔧 Ejecutando test manual con SSH..."
-    for node in "${NODES[@]}"; do
-        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 ansible@$node "echo 'Test OK'" 2>/dev/null; then
-            log "✅ $node - Conectividad SSH OK"
-        else
-            log "❌ $node - Conectividad SSH falló"
-        fi
-    done
+    log "⚠️ Ansible no está instalado, omitiendo test de conectividad final."
 fi
 
-if [ $failed_nodes -eq 0 ]; then
-    log "🎉 Distribución de claves SSH completada exitosamente"
-    exit 0
-else
-    log "⚠️ Distribución completada con errores - $failed_nodes nodos fallaron"
+
+if [ "$failed_nodes" -gt 0 ]; then
+    log "❌ Finalizado con $failed_nodes nodos fallidos."
     exit 1
+else
+    log "🎉 Distribución de claves SSH completada exitosamente para todos los nodos."
+    exit 0
 fi

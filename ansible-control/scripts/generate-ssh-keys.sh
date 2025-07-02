@@ -53,7 +53,7 @@ if [ ! -f "$AUTHORIZED_KEYS" ]; then
     log "✅ Archivo authorized_keys configurado"
 else
     # Verificar que nuestra clave esté en authorized_keys
-    if ! grep -q "$(cat $PUBLIC_KEY)" "$AUTHORIZED_KEYS" 2>/dev/null; then
+    if ! grep -q -F "$(cat "$PUBLIC_KEY")" "$AUTHORIZED_KEYS" 2>/dev/null; then
         log "➕ Agregando clave pública a authorized_keys..."
         cat "$PUBLIC_KEY" >> "$AUTHORIZED_KEYS"
     fi

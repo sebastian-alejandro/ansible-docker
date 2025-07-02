@@ -28,9 +28,10 @@ wait_for_systemd() {
     echo -e "${YELLOW}⏳ Waiting for systemd to be ready...${NC}"
     local timeout=30  # Reduced timeout for CI
     local count=0
+    local status
     
     while [ $count -lt $timeout ]; do
-        local status=$(systemctl is-system-running 2>/dev/null || echo "offline")
+        status=$(systemctl is-system-running 2>/dev/null || echo "offline")
         if echo "$status" | grep -E "(running|degraded)" > /dev/null; then
             echo -e "${GREEN}✅ Systemd is ready${NC}"
             return 0
@@ -303,9 +304,123 @@ main() {
     echo "  - Ansible Password: ansible123"
     echo "  - Root Password: rootpass123"
     
-    # Keep container running and handle signals properly
-    trap "echo 'Shutting down...'; kill \$INIT_PID" TERM INT
-    wait $INIT_PID
+    # Configure SSH key for ansible user
+    if [ -n "$ANSIBLE_USER" ] && [ -n "$ANSIBLE_SSH_KEY" ]; then
+        echo "Configuring SSH key for user $ANSIBLE_USER..."
+        local ansible_user_home
+        ansible_user_home=$(getent passwd "$ANSIBLE_USER" | cut -d: -f6)
+
+        if [ ! -d "$ansible_user_home/.ssh" ]; then
+            mkdir -p "$ansible_user_home/.ssh"
+            chown "$ANSIBLE_USER:$ANSIBLE_USER" "$ansible_user_home/.ssh"
+            chmod 700 "$ansible_user_home/.ssh"
+        fi
+
+        if [ ! -f "$ansible_user_home/.ssh/authorized_keys" ]; then
+            touch "$ansible_user_home/.ssh/authorized_keys"
+            chown "$ANSIBLE_USER:$ANSIBLE_USER" "$ansible_user_home/.ssh/authorized_keys"
+            chmod 600 "$ansible_user_home/.ssh/authorized_keys"
+        fi
+
+        # Add key if it doesn't exist
+        if ! grep -q "$ANSIBLE_SSH_KEY" "$ansible_user_home/.ssh/authorized_keys"; then
+            echo "$ANSIBLE_SSH_KEY" >> "$ansible_user_home/.ssh/authorized_keys"
+            echo "SSH key added."
+        else
+            echo "SSH key already exists."
+        fi
+    fi
+    
+    # Initial health check
+    run_health_check() {
+        echo -e "${YELLOW}🩺 Running initial health check...${NC}"
+        local status
+        health_check
+        status=$?
+        if [ $status -eq 0 ]; then
+            echo -e "${GREEN}✅ Health check passed${NC}"
+        else
+            echo -e "${RED}❌ Health check failed with status ${status}${NC}"
+        fi
+    }
+
+    # Cleanup function
+    cleanup() {
+        echo "Cleaning up..."
+        # Add any cleanup tasks here
+    }
+
+    # Trap signals for graceful shutdown
+    trap 'echo "Caught SIGTERM. Shutting down."; cleanup; exit 0' SIGTERM
+    trap 'echo "Caught SIGINT. Shutting down."; cleanup; exit 0' SIGINT
+
+    # ===================
+    # Main Execution
+    # ===================
+
+    # Run init script if it exists
+    run_init_script() {
+        local init_script_path="/usr/local/bin/init.sh"
+        echo "Looking for init script at ${init_script_path}..."
+        if [ -x "$init_script_path" ]; then
+            echo "Found and executing init script..."
+            "$init_script_path"
+        else
+            echo "Init script not found or not executable."
+        fi
+    }
+
+    # Start services based on mode
+    if [ "$CI_MODE" = "true" ]; then
+        echo "Starting services in CI mode..."
+        # In CI mode, we might not need all services
+        # For example, we may skip SSH and just run the playbook directly
+        if ! systemctl is-active --quiet crond; then
+            echo "Starting cron service..."
+            systemctl start crond
+            if systemctl is_active --quiet crond; then
+                echo -e "${GREEN}✅ Cron service started${NC}"
+            else
+                echo -e "${YELLOW}⚠️ Cron service failed to start (non-critical)${NC}"
+            fi
+        else
+            echo -e "${GREEN}✅ Cron service already running${NC}"
+        fi
+    else
+        echo "Starting services in normal mode..."
+        # In normal mode, start all essential services
+        if ! start_services; then
+            echo -e "${RED}❌ Failed to start essential services${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Validate environment
+    validate_environment
+    
+    echo -e "${GREEN}🎉 Ansible Docker Environment is ready!${NC}"
+    echo -e "${YELLOW}📋 Container Info:${NC}"
+    echo "  - SSH Port: 22"
+    echo "  - Ansible User: ansible"
+    echo "  - Ansible Password: ansible123"
+    echo "  - Root Password: rootpass123"
+    
+    # Stop SSHD if running in foreground
+    stop_foreground_sshd() {
+        local pid
+        pid=$(pgrep -f "/usr/sbin/sshd -D")
+        if [ -n "$pid" ]; then
+            echo "Stopping foreground SSHD (PID: $pid)..."
+            kill "$pid"
+            wait "$pid" 2>/dev/null
+        fi
+    }
+
+    # Final cleanup actions
+    cleanup() {
+        echo "Performing final cleanup..."
+        # Add any final cleanup tasks here
+    }
 }
 
 # Execute main function with all arguments
