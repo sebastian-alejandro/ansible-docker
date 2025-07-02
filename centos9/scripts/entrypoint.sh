@@ -304,7 +304,7 @@ main() {
     echo "  - Root Password: rootpass123"
     
     # Keep container running and handle signals properly
-    trap "echo 'Shutting down...'; kill $INIT_PID" TERM INT
+    trap "echo 'Shutting down...'; kill \$INIT_PID" TERM INT
     wait $INIT_PID
 }
 
