@@ -2,7 +2,7 @@
 """
 ===================================
 Git Version Control Script
-Automated commit and push for CI/CD fixes
+Automated commit, tag, and release management
 ===================================
 """
 
@@ -10,7 +10,9 @@ import subprocess
 import sys
 import os
 import json
+import argparse
 from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Optional
 
 class Colors:
@@ -25,11 +27,12 @@ class Colors:
 class GitVersionControl:
     """Git version control automation"""
     
-    def __init__(self):
-        self.version = "v1.2.1"
+    def __init__(self, version: Optional[str] = None):
+        self.version = version or "1.3.0" # Default version
         self.branch = "main"
+        self.project_root = Path.cwd()
         
-    def run_command(self, command: List[str], capture_output: bool = True) -> subprocess.CompletedProcess:
+    def run_command(self, command: List[str], capture_output: bool = True, shell: bool = False) -> subprocess.CompletedProcess:
         """Run a shell command and return the result"""
         try:
             result = subprocess.run(
@@ -37,7 +40,8 @@ class GitVersionControl:
                 capture_output=capture_output,
                 text=True,
                 check=False,
-                cwd=os.getcwd()
+                cwd=self.project_root,
+                shell=shell
             )
             return result
         except Exception as e:
@@ -51,213 +55,182 @@ class GitVersionControl:
     def check_git_status(self) -> bool:
         """Check if we're in a git repository and get status"""
         self.print_status("🔍 Checking Git status...", Colors.BLUE)
-        
-        # Check if we're in a git repo
         result = self.run_command(["git", "status", "--porcelain"])
         if result.returncode != 0:
             self.print_status("❌ Not in a Git repository", Colors.RED)
             return False
         
-        # Show current branch
-        branch_result = self.run_command(["git", "branch", "--show-current"])
-        if branch_result.stdout:
-            current_branch = branch_result.stdout.strip()
-            self.print_status(f"📍 Current branch: {current_branch}", Colors.CYAN)
-            self.branch = current_branch
-        
-        # Show status
-        if result.stdout:
-            self.print_status("📋 Modified files:", Colors.YELLOW)
-            for line in result.stdout.strip().split('\n'):
-                if line.strip():
-                    status = line[:2]
-                    filepath = line[3:]
-                    status_symbol = "📝" if "M" in status else "➕" if "A" in status else "❓"
-                    print(f"  {status_symbol} {filepath}")
-        else:
+        if not result.stdout.strip():
             self.print_status("✅ Working directory clean", Colors.GREEN)
-        
+            return False # No changes to commit
+
+        self.print_status("📋 Changes detected:", Colors.YELLOW)
+        print(result.stdout.strip())
         return True
 
-    def add_files(self) -> bool:
-        """Add modified files to staging"""
-        self.print_status("📦 Adding files to staging...", Colors.BLUE)
+    def create_structured_commits(self):
+        """Create structured commits based on file categories"""
+        self.print_status("\n📝 Creating structured commits...", Colors.BLUE)
+
+        # Add all changes to the index, including deletions
+        self.run_command(["git", "add", "-A"])
+
+        commit_groups = [
+            {
+                "message": "refactor(scripts): Consolidate validation and versioning scripts",
+                "files": [
+                    "version_control.py", "pre_commit_check.py",
+                    "validate_phase1.py", "create_github_release.py", "release_phase1.py",
+                    "manage-sprint2.sh", "requirements-validation.txt"
+                ]
+            },
+            {
+                "message": "docs: Consolidate and clean up documentation files",
+                "files": [
+                    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/",
+                    "RELEASE_NOTES_v1.3.0.md", "phase1-summary.md",
+                    "README_new.md", "CHANGELOG_new.md", "CONTRIBUTING_new.md",
+                    "PYTHON_SCRIPTS_README.md", "docs/README.md", "docs/README_new.md",
+                    "docs/phase1-testing-suite.md", "docs/validate-phase1-python.md"
+                ]
+            }
+        ]
+
+        # Commit refactoring and documentation changes first
+        for group in commit_groups:
+            # Use git diff to see if there are changes for this specific group
+            # We need to check against HEAD for both staged and unstaged changes that we just added
+            cmd = ["git", "diff", "--cached", "--quiet", "--"] + group["files"]
+            result = self.run_command(cmd)
+
+            # A non-zero exit code from `git diff --quiet` means there are differences
+            if result.returncode != 0:
+                commit_cmd = ["git", "commit", "-m", group["message"]]
+                commit_result = self.run_command(commit_cmd)
+                if commit_result.returncode == 0:
+                    self.print_status(f"✅ Commit created: {group['message']}", Colors.GREEN)
+                else:
+                    self.print_status(f"❌ Failed to commit: {group['message']}", Colors.RED)
+                    print(commit_result.stderr)
+                    # If a commit fails, we stop to avoid issues
+                    return
+
+        # Commit any remaining changes with a general message
+        if self.check_git_status():
+             self.print_status("⚙️ Committing remaining changes...", Colors.BLUE)
+             final_commit_cmd = ["git", "commit", "-m", "chore: Apply remaining updates"]
+             final_commit_result = self.run_command(final_commit_cmd)
+             if final_commit_result.returncode == 0:
+                 self.print_status("✅ Final commit created.", Colors.GREEN)
+             else:
+                 self.print_status("❌ Failed to create final commit.", Colors.RED)
+                 print(final_commit_result.stderr)
+
+    def create_tag(self):
+        """Create and push a git tag"""
+        tag = f"v{self.version}"
+        self.print_status(f"\n🏷️ Creating tag {tag}...", Colors.BLUE)
         
-        # Add all modified files
-        result = self.run_command(["git", "add", "."])
-        if result.returncode != 0:
-            self.print_status("❌ Failed to add files", Colors.RED)
+        # Create tag
+        tag_cmd = ["git", "tag", "-a", tag, "-m", f"Release version {self.version}"]
+        result = self.run_command(tag_cmd)
+        if result.returncode != 0 and "already exists" not in result.stderr:
+            self.print_status(f"❌ Failed to create tag {tag}", Colors.RED)
             print(result.stderr)
-            return False
-        
-        # Show what was staged
-        result = self.run_command(["git", "status", "--staged", "--porcelain"])
-        if result.stdout:
-            self.print_status("✅ Files staged for commit:", Colors.GREEN)
-            for line in result.stdout.strip().split('\n'):
-                if line.strip():
-                    filepath = line[3:]
-                    print(f"  ✓ {filepath}")
-        
-        return True
+            return
 
-    def create_commit(self) -> bool:
-        """Create commit with descriptive message"""
-        self.print_status("💾 Creating commit...", Colors.BLUE)
-        
-        commit_message = f"""🔧 Fix CI/CD: Compatibilidad con Fallback Mode
-
-📋 Resumen de Cambios:
-- ✅ Corrección de tests funcionales para modo fallback
-- ✅ Lógica adaptativa: systemd vs fallback mode  
-- ✅ Variables CI agregadas a todos los contenedores
-- ✅ Scripts Python multiplataforma (reemplazó PowerShell)
-- ✅ Documentación actualizada
-
-🛠️ Archivos Modificados:
-- .github/workflows/ci-cd.yml: Tests compatibles
-- test_functional_ci.py: Script de prueba Python
-- version_control.py: Control de versión Python
-- docs/: Documentación actualizada
-
-🎯 Problema Resuelto:
-Los tests de GitHub Actions fallaban con timeout porque
-intentaban usar systemctl en containers en fallback mode.
-Ahora detectan automáticamente el modo y usan la lógica apropiada.
-
-📈 Resultado Esperado:
-- Tests pasan sin timeout en GitHub Actions
-- Compatibilidad mantenida con desarrollo local
-- Scripts multiplataforma con Python
-
-Version: {self.version}
-Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
-        
-        result = self.run_command(["git", "commit", "-m", commit_message])
-        if result.returncode != 0:
-            self.print_status("❌ Failed to create commit", Colors.RED)
-            print(result.stderr)
-            return False
-        
-        self.print_status("✅ Commit created successfully", Colors.GREEN)
-        return True
-
-    def push_changes(self) -> bool:
-        """Push changes to remote repository"""
-        self.print_status("🚀 Pushing changes to remote...", Colors.BLUE)
-        
-        result = self.run_command(["git", "push", "origin", self.branch])
-        if result.returncode != 0:
-            self.print_status("❌ Failed to push changes", Colors.RED)
-            print(result.stderr)
-            return False
-        
-        self.print_status("✅ Changes pushed successfully", Colors.GREEN)
-        return True
-
-    def create_tag(self) -> bool:
-        """Create and push version tag"""
-        self.print_status(f"🏷️ Creating version tag {self.version}...", Colors.BLUE)
-        
-        # Create annotated tag
-        tag_message = f"CI/CD Fix: Fallback Mode Compatibility {self.version}"
-        result = self.run_command(["git", "tag", "-a", self.version, "-m", tag_message])
-        if result.returncode != 0:
-            self.print_status("❌ Failed to create tag", Colors.RED)
-            print(result.stderr)
-            return False
-        
         # Push tag
-        result = self.run_command(["git", "push", "origin", self.version])
-        if result.returncode != 0:
-            self.print_status("❌ Failed to push tag", Colors.RED)
+        push_cmd = ["git", "push", "origin", tag]
+        result = self.run_command(push_cmd)
+        if result.returncode == 0:
+            self.print_status(f"✅ Tag {tag} pushed successfully.", Colors.GREEN)
+        else:
+            self.print_status(f"❌ Failed to push tag {tag}", Colors.RED)
             print(result.stderr)
-            return False
-        
-        self.print_status(f"✅ Tag {self.version} created and pushed", Colors.GREEN)
-        return True
 
-    def show_final_status(self):
-        """Show final repository status"""
-        self.print_status("📊 Final repository status:", Colors.BLUE)
-        
-        # Show last commit
-        result = self.run_command(["git", "log", "--oneline", "-1"])
-        if result.stdout:
-            self.print_status(f"📝 Last commit: {result.stdout.strip()}", Colors.CYAN)
-        
-        # Show remote status
-        result = self.run_command(["git", "status", "-b", "--porcelain"])
-        if result.stdout:
-            for line in result.stdout.strip().split('\n'):
-                if line.startswith('##'):
-                    branch_info = line[3:]
-                    self.print_status(f"🌿 Branch status: {branch_info}", Colors.CYAN)
-                    break
+class GitHubReleaseCreator:
+    def __init__(self, version: str):
+        self.version = version
+        self.tag = f"v{self.version}"
+        self.release_notes_file = Path("docs") / "release-notes.md"
 
-    def run_version_control(self) -> bool:
-        """Run complete version control process"""
+    def check_gh_cli(self) -> bool:
+        """Check if GitHub CLI is available"""
+        print("\n🔍 Checking for GitHub CLI...")
         try:
-            self.print_status("🚀 Iniciando Control de Versión para CI/CD Fixes...", Colors.GREEN)
-            
-            # Check git status
-            if not self.check_git_status():
-                return False
-            
-            # Confirm with user
-            response = input(f"\n{Colors.YELLOW}¿Continuar con commit y push? (y/N): {Colors.NC}")
-            if response.lower() not in ['y', 'yes', 'sí', 's']:
-                self.print_status("⚠️ Operación cancelada por el usuario", Colors.YELLOW)
-                return True
-            
-            # Add files
-            if not self.add_files():
-                return False
-            
-            # Create commit
-            if not self.create_commit():
-                return False
-            
-            # Push changes
-            if not self.push_changes():
-                return False
-            
-            # Create and push tag
-            if not self.create_tag():
-                return False
-            
-            # Show final status
-            self.show_final_status()
-            
-            self.print_status("🎉 Control de versión completado exitosamente!", Colors.GREEN)
-            self.print_status("🔄 El workflow de GitHub Actions se ejecutará automáticamente", Colors.CYAN)
-            
+            result = subprocess.run(["gh", "--version"], capture_output=True, text=True, check=True)
+            print("✅ GitHub CLI available")
             return True
-            
-        except KeyboardInterrupt:
-            self.print_status("⚠️ Proceso interrumpido por el usuario", Colors.YELLOW)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("❌ GitHub CLI not found or not working.")
+            print("💡 Install from: https://cli.github.com/")
             return False
-        except Exception as e:
-            self.print_status(f"❌ Error en control de versión: {e}", Colors.RED)
+
+    def check_gh_auth(self) -> bool:
+        """Check GitHub authentication status"""
+        print("\n🔐 Checking GitHub authentication...")
+        try:
+            result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, check=True)
+            print("✅ Authenticated with GitHub")
+            return True
+        except subprocess.CalledProcessError:
+            print("❌ Not authenticated with GitHub.")
+            print("💡 Run: gh auth login")
             return False
+
+    def create_release(self):
+        """Create a new GitHub release"""
+        if not self.check_gh_cli() or not self.check_gh_auth():
+            sys.exit(1)
+
+        print(f"\n🚀 Creating GitHub release for tag {self.tag}...")
+        if not self.release_notes_file.exists():
+            print(f"❌ Release notes not found at {self.release_notes_file}")
+            sys.exit(1)
+
+        cmd = [
+            "gh", "release", "create", self.tag,
+            "--title", f"Release v{self.version}",
+            "--notes-file", str(self.release_notes_file),
+            "--latest"
+        ]
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print(f"\n✅ {Colors.GREEN}Release created successfully!{Colors.NC}")
+            print(f"🔗 URL: {result.stdout.strip()}")
+        except subprocess.CalledProcessError as e:
+            print(f"\n❌ {Colors.RED}Failed to create GitHub release.{Colors.NC}")
+            print(e.stderr)
+            if "release with this tag already exists" in e.stderr:
+                print(f"💡 A release for tag {self.tag} already exists.")
+            sys.exit(1)
 
 def main():
-    """Main entry point"""
-    # Check if git is available
-    try:
-        result = subprocess.run(["git", "--version"], capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"{Colors.RED}❌ Git is not available{Colors.NC}")
-            sys.exit(1)
-    except FileNotFoundError:
-        print(f"{Colors.RED}❌ Git is not installed{Colors.NC}")
-        sys.exit(1)
+    """Main function to drive the script"""
+    parser = argparse.ArgumentParser(description="Git Version Control and Release Tool")
+    parser.add_argument("action", choices=["commit", "tag", "release"], help="The action to perform")
+    parser.add_argument("--version", help="The version number to use (e.g., 1.3.0)")
+
+    args = parser.parse_args()
+
+    if not args.version and (args.action == 'tag' or args.action == 'release'):
+        parser.error("--version is required for 'tag' and 'release' actions.")
+
+    git_control = GitVersionControl(version=args.version)
+
+    if args.action == "commit":
+        if git_control.check_git_status():
+            git_control.create_structured_commits()
+        else:
+            print("No changes to commit.")
     
-    # Run version control
-    vc = GitVersionControl()
-    success = vc.run_version_control()
-    
-    sys.exit(0 if success else 1)
+    elif args.action == "tag":
+        git_control.create_tag()
+
+    elif args.action == "release":
+        release_creator = GitHubReleaseCreator(version=args.version)
+        release_creator.create_release()
 
 if __name__ == "__main__":
     main()

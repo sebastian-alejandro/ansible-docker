@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-===================================
+==================================
 Pre-commit Verification Script
 Validates changes before committing
-===================================
+==================================
 """
 
 import subprocess
@@ -11,6 +11,9 @@ import sys
 import os
 import json
 from pathlib import Path
+import time
+import argparse
+import platform
 from typing import List, Dict, Optional, Tuple
 
 # Try to import yaml, but make it optional
@@ -20,48 +23,178 @@ try:
 except ImportError:
     HAS_YAML = False
 
+# Constantes
+CRITICAL_FILES = [
+    "ansible-control/Dockerfile",
+    "ansible-control/config/ansible.cfg",
+    "ansible-control/scripts/init-control-node.sh",
+    "ansible-control/scripts/generate-ssh-keys.sh",
+    "ansible-control/scripts/generate-inventory.sh",
+    "ansible-control/scripts/distribute-ssh-keys.sh",
+    "ansible-control/scripts/health-check-control.sh",
+    "ansible-control/playbooks/ping.yml",
+    "ansible-control/playbooks/setup-base.yml",
+    "ansible-control/playbooks/setup-webservers.yml",
+    "docker-compose.yml"
+]
+
 class Colors:
     """ANSI color codes for terminal output"""
-    RED = '\033[0;31m'
-    GREEN = '\033[0;32m'
-    YELLOW = '\033[1;33m'
-    BLUE = '\033[0;34m'
-    CYAN = '\033[0;36m'
-    NC = '\033[0m'  # No Color
+    if platform.system() == "Windows":
+        try:
+            import colorama
+            colorama.init()
+            RED = '\033[0;31m'
+            GREEN = '\033[0;32m'
+            YELLOW = '\033[1;33m'
+            BLUE = '\033[0;34m'
+            CYAN = '\033[0;36m'
+            NC = '\033[0m'
+        except ImportError:
+            RED = GREEN = YELLOW = BLUE = CYAN = NC = ''
+    else:
+        RED = '\033[0;31m'
+        GREEN = '\033[0;32m'
+        YELLOW = '\033[1;33m'
+        BLUE = '\033[0;34m'
+        CYAN = '\033[0;36m'
+        NC = '\033[0m'
+
+class Logger:
+    """Clase para logging con colores"""
+    
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+    
+    def info(self, message: str):
+        print(f"{Colors.BLUE}[INFO]{Colors.NC} {message}")
+    
+    def success(self, message: str):
+        print(f"{Colors.GREEN}[SUCCESS]{Colors.NC} {message}")
+    
+    def warning(self, message: str):
+        print(f"{Colors.YELLOW}[WARNING]{Colors.NC} {message}")
+    
+    def error(self, message: str):
+        print(f"{Colors.RED}[ERROR]{Colors.NC} {message}")
+    
+    def debug(self, message: str):
+        if self.verbose:
+            print(f"{Colors.CYAN}[DEBUG]{Colors.NC} {message}")
 
 class PreCommitValidator:
     """Pre-commit validation checks"""
     
-    def __init__(self):
+    def __init__(self, skip_performance: bool = False, verbose: bool = False, docker_compose_cmd: Optional[str] = None):
         self.errors = []
         self.warnings = []
         self.passed_checks = []
-        
-    def run_command(self, command: List[str], capture_output: bool = True) -> subprocess.CompletedProcess:
+        self.logger = Logger(verbose)
+        self.skip_performance = skip_performance
+        self.docker_compose_cmd = docker_compose_cmd or self._detect_docker_compose()
+        self.project_root = Path.cwd()
+
+    def _detect_docker_compose(self) -> str:
+        """Detectar automáticamente el comando docker-compose disponible"""
+        commands_to_try = ["docker compose", "docker-compose"]
+        for cmd in commands_to_try:
+            try:
+                subprocess.run(cmd.split() + ["--version"], capture_output=True, check=True, text=True)
+                self.logger.debug(f"Comando docker-compose detectado: {cmd}")
+                return cmd
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                continue
+        self.logger.warning("No se pudo encontrar un comando docker-compose funcional.")
+        return "docker-compose"
+
+    def run_command(self, command: List[str], capture_output: bool = True, **kwargs) -> subprocess.CompletedProcess:
         """Run a shell command and return the result"""
+        self.logger.debug(f"Ejecutando comando: {' '.join(command)}")
         try:
             result = subprocess.run(
                 command,
                 capture_output=capture_output,
                 text=True,
                 check=False,
-                cwd=os.getcwd()
+                cwd=kwargs.get("cwd", self.project_root),
+                **kwargs
             )
+            if result.stdout and capture_output:
+                self.logger.debug(f"Salida del comando: {result.stdout.strip()}")
+            if result.stderr and capture_output:
+                self.logger.debug(f"Errores del comando: {result.stderr.strip()}")
             return result
         except Exception as e:
+            self.logger.error(f"Excepción al ejecutar el comando: {e}")
             return subprocess.CompletedProcess(command, 1, "", str(e))
 
     def print_status(self, message: str, color: str = Colors.YELLOW):
         """Print a colored status message"""
         print(f"{color}{message}{Colors.NC}")
 
+    def check_critical_files(self) -> bool:
+        """Verificar la existencia de archivos críticos"""
+        self.logger.info("Verificando la existencia de archivos críticos...")
+        all_found = True
+        for file_path in CRITICAL_FILES:
+            if not (self.project_root / file_path).exists():
+                self.errors.append(f"Archivo crítico no encontrado: {file_path}")
+                all_found = False
+        if all_found:
+            self.logger.success("Todos los archivos críticos fueron encontrados.")
+        else:
+            self.logger.error("Faltan archivos críticos.")
+        return all_found
+
+    def docker_compose_up(self) -> bool:
+        """Levantar el entorno con Docker Compose"""
+        self.logger.info("Levantando el entorno de Docker...")
+        cmd = self.docker_compose_cmd.split() + ["up", "--build", "-d"]
+        result = self.run_command(cmd, capture_output=True)
+        if result.returncode == 0:
+            self.logger.success("Entorno Docker iniciado correctamente.")
+            time.sleep(10)  # Esperar a que los servicios se inicien
+            return True
+        else:
+            self.errors.append(f"Error al levantar el entorno Docker: {result.stderr}")
+            self.logger.error("No se pudo iniciar el entorno Docker.")
+            return False
+
+    def docker_compose_down(self):
+        """Detener el entorno de Docker Compose"""
+        self.logger.info("Deteniendo el entorno de Docker...")
+        cmd = self.docker_compose_cmd.split() + ["down", "--volumes"]
+        self.run_command(cmd)
+        self.logger.success("Entorno Docker detenido y volúmenes eliminados.")
+
+    def run_playbook(self, playbook: str, inventory: str = "config/managed_nodes.yml") -> bool:
+        """Ejecutar un playbook de Ansible"""
+        self.logger.info(f"Ejecutando playbook: {playbook}...")
+        cmd = self.docker_compose_cmd.split() + [
+            "exec", "-T", "ansible-control",
+            "ansible-playbook", f"playbooks/{playbook}",
+            "-i", inventory
+        ]
+        result = self.run_command(cmd, capture_output=True)
+        if result.returncode == 0:
+            self.logger.success(f"Playbook {playbook} ejecutado exitosamente.")
+            return True
+        else:
+            self.errors.append(f"Error al ejecutar el playbook {playbook}: {result.stderr}")
+            self.logger.error(f"Falló la ejecución del playbook {playbook}.")
+            return False
+
     def check_yaml_syntax(self) -> bool:
         """Validate YAML files syntax"""
         self.print_status("🔍 Validating YAML files...", Colors.BLUE)
         
         yaml_files = [
-            ".github/workflows/ci-cd.yml",
-            "docker-compose.yml"
+            "docker-compose.yml",
+            "ansible-control/playbooks/ping.yml",
+            "ansible-control/playbooks/setup-base.yml",
+            "ansible-control/playbooks/setup-webservers.yml",
+            "ansible-control/config/all.yml",
+            "ansible-control/config/managed_nodes.yml"
         ]
         
         if not HAS_YAML:
@@ -74,7 +207,7 @@ class PreCommitValidator:
             if os.path.exists(yaml_file):
                 try:
                     with open(yaml_file, 'r', encoding='utf-8') as f:
-                        yaml.safe_load(f)  # type: ignore
+                        yaml.safe_load(f)
                     self.passed_checks.append(f"✅ {yaml_file}: Valid YAML syntax")
                 except Exception as e:
                     self.errors.append(f"❌ {yaml_file}: Invalid YAML - {e}")
@@ -84,271 +217,79 @@ class PreCommitValidator:
         
         return all_valid
 
-    def check_docker_files(self) -> bool:
-        """Validate Docker-related files"""
-        self.print_status("🐳 Validating Docker files...", Colors.BLUE)
-        
-        # Check Dockerfile exists
-        dockerfile_path = "centos9/Dockerfile"
-        if os.path.exists(dockerfile_path):
-            self.passed_checks.append(f"✅ {dockerfile_path}: Exists")
-            
-            # Basic Dockerfile validation
-            try:
-                with open(dockerfile_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    if "FROM" in content:
-                        self.passed_checks.append("✅ Dockerfile: Has FROM instruction")
-                    else:
-                        self.errors.append("❌ Dockerfile: Missing FROM instruction")
-                        return False
-            except Exception as e:
-                self.errors.append(f"❌ Dockerfile: Error reading - {e}")
-                return False
-        else:
-            self.errors.append(f"❌ {dockerfile_path}: File not found")
-            return False
-        
-        # Check docker-compose.yml
-        compose_path = "docker-compose.yml"
-        if os.path.exists(compose_path):
-            try:
-                with open(compose_path, 'r', encoding='utf-8') as f:
-                    if HAS_YAML:
-                        compose_data = yaml.safe_load(f)  # type: ignore
-                        if 'services' in compose_data:
-                            self.passed_checks.append("✅ docker-compose.yml: Has services section")
-                        else:
-                            self.warnings.append("⚠️ docker-compose.yml: No services section")
-                    else:
-                        # Basic text validation without yaml parsing
-                        content = f.read()
-                        if 'services:' in content:
-                            self.passed_checks.append("✅ docker-compose.yml: Has services section")
-                        else:
-                            self.warnings.append("⚠️ docker-compose.yml: No services section found")
-            except Exception as e:
-                self.errors.append(f"❌ docker-compose.yml: Error parsing - {e}")
-                return False
-        
-        return True
-
-    def check_python_syntax(self) -> bool:
-        """Validate Python files syntax"""
-        self.print_status("🐍 Validating Python files...", Colors.BLUE)
-        
-        python_files = []
-        for root, dirs, files in os.walk("."):
-            # Skip hidden directories and common non-source directories
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules']]
-            
-            for file in files:
-                if file.endswith('.py'):
-                    python_files.append(os.path.join(root, file))
-        
-        all_valid = True
-        for py_file in python_files:
-            try:
-                # Check syntax by compiling
-                with open(py_file, 'r', encoding='utf-8') as f:
-                    compile(f.read(), py_file, 'exec')
-                self.passed_checks.append(f"✅ {py_file}: Valid Python syntax")
-            except SyntaxError as e:
-                self.errors.append(f"❌ {py_file}: Syntax error at line {e.lineno} - {e.msg}")
-                all_valid = False
-            except Exception as e:
-                self.errors.append(f"❌ {py_file}: Error reading file - {e}")
-                all_valid = False
-        
-        return all_valid
-
-    def check_git_status(self) -> bool:
-        """Check git repository status"""
-        self.print_status("📋 Checking Git status...", Colors.BLUE)
-        
-        # Check if we're in a git repo
-        result = self.run_command(["git", "status", "--porcelain"])
-        if result.returncode != 0:
-            self.errors.append("❌ Not in a Git repository")
-            return False
-        
-        # Check for modified files
-        if result.stdout.strip():
-            modified_files = len(result.stdout.strip().split('\n'))
-            self.passed_checks.append(f"✅ Git: {modified_files} modified files ready for commit")
-        else:
-            self.warnings.append("⚠️ Git: No modified files to commit")
-        
-        # Check current branch
-        branch_result = self.run_command(["git", "branch", "--show-current"])
-        if branch_result.stdout:
-            branch = branch_result.stdout.strip()
-            self.passed_checks.append(f"✅ Git: Current branch is '{branch}'")
-        
-        return True
-
-    def check_required_files(self) -> bool:
-        """Check for required project files"""
-        self.print_status("📁 Checking required files...", Colors.BLUE)
-        
-        required_files = [
-            "README.md",
-            "CHANGELOG.md", 
-            "LICENSE",
-            "CONTRIBUTING.md",
-            ".gitignore"
-        ]
-        
-        all_present = True
-        for file_path in required_files:
-            if os.path.exists(file_path):
-                self.passed_checks.append(f"✅ {file_path}: Exists")
-            else:
-                self.warnings.append(f"⚠️ {file_path}: Missing (recommended)")
-        
-        # Check for critical files
-        critical_files = [
-            ".github/workflows/ci-cd.yml",
-            "centos9/Dockerfile",
-            "docker-compose.yml"
-        ]
-        
-        for file_path in critical_files:
-            if os.path.exists(file_path):
-                self.passed_checks.append(f"✅ {file_path}: Critical file exists")
-            else:
-                self.errors.append(f"❌ {file_path}: Critical file missing")
-                all_present = False
-        
-        return all_present
-
-    def check_workflow_syntax(self) -> bool:
-        """Validate GitHub Actions workflow"""
-        self.print_status("⚙️ Validating GitHub Actions workflow...", Colors.BLUE)
-        
-        workflow_file = ".github/workflows/ci-cd.yml"
-        if not os.path.exists(workflow_file):
-            self.errors.append(f"❌ {workflow_file}: Workflow file not found")
-            return False
-        
-        try:
-            with open(workflow_file, 'r', encoding='utf-8') as f:
-                if HAS_YAML:
-                    workflow = yaml.safe_load(f)  # type: ignore
-                else:
-                    # Basic text validation without yaml parsing
-                    content = f.read()
-                    workflow = {
-                        'name': 'name:' in content,
-                        'on': 'on:' in content,
-                        'jobs': 'jobs:' in content
-                    }
-            
-            # Check required sections
-            required_sections = ['name', 'on', 'jobs']
-            for section in required_sections:
-                if HAS_YAML:
-                    section_exists = section in workflow
-                else:
-                    section_exists = workflow.get(section, False)
-                
-                if section_exists:
-                    self.passed_checks.append(f"✅ Workflow: Has '{section}' section")
-                else:
-                    self.errors.append(f"❌ Workflow: Missing '{section}' section")
-                    return False
-            
-            # Check for our specific jobs (only if yaml is available)
-            if HAS_YAML:
-                expected_jobs = ['build-tests', 'functional-tests', 'ssh-tests', 'security-tests', 'integration-tests']
-                if 'jobs' in workflow and isinstance(workflow['jobs'], dict):
-                    actual_jobs = list(workflow['jobs'].keys())
-                    for job in expected_jobs:
-                        if job in actual_jobs:
-                            self.passed_checks.append(f"✅ Workflow: Has '{job}' job")
-                        else:
-                            self.warnings.append(f"⚠️ Workflow: Missing '{job}' job")
-            else:
-                self.warnings.append("⚠️ Workflow: Job validation skipped (PyYAML not available)")
-            
-            return True
-            
-        except Exception as e:
-            self.errors.append(f"❌ Workflow: Error parsing - {e}")
-            return False
-
     def run_all_checks(self) -> bool:
-        """Run all validation checks"""
-        self.print_status("🔍 Running pre-commit validation checks...", Colors.GREEN)
-        print()
+        """Run all pre-commit checks"""
+        self.print_status("🚀 Starting pre-commit validation...", Colors.CYAN)
         
-        checks = [
-            ("Git Status", self.check_git_status),
-            ("Required Files", self.check_required_files),
-            ("YAML Syntax", self.check_yaml_syntax),
-            ("Docker Files", self.check_docker_files),
-            ("Python Syntax", self.check_python_syntax),
-            ("GitHub Actions Workflow", self.check_workflow_syntax),
-        ]
+        # Static checks
+        self.check_yaml_syntax()
         
-        all_passed = True
-        for check_name, check_func in checks:
-            if not check_func():
-                all_passed = False
-        
-        # Print summary
-        print()
+        # Phase 1 validation logic
+        if not self.check_critical_files():
+            # No continuar si faltan archivos esenciales
+            return False 
+
+        if not self.docker_compose_up():
+            self.docker_compose_down()
+            return False
+
+        success = True
+        try:
+            if not self.run_playbook("ping.yml"):
+                success = False
+            if success and not self.run_playbook("setup-base.yml"):
+                success = False
+            if success and not self.run_playbook("setup-webservers.yml"):
+                success = False
+        finally:
+            self.docker_compose_down()
+
         self.print_summary()
-        
-        return all_passed
+        return not self.errors
 
     def print_summary(self):
-        """Print validation summary"""
-        self.print_status("📊 Validation Summary", Colors.BLUE)
-        print()
-        
-        # Passed checks
-        if self.passed_checks:
-            self.print_status("✅ PASSED CHECKS:", Colors.GREEN)
-            for check in self.passed_checks:
-                print(f"  {check}")
-            print()
-        
-        # Warnings
+        """Print the summary of all checks"""
+        print("\n" + "="*50)
+        self.print_status("📊 Validation Summary", Colors.CYAN)
+        print("="*50)
+
+        for check in self.passed_checks:
+            print(f"{Colors.GREEN}{check}{Colors.NC}")
+
         if self.warnings:
-            self.print_status("⚠️ WARNINGS:", Colors.YELLOW)
+            self.print_status("\n⚠️ Warnings:", Colors.YELLOW)
             for warning in self.warnings:
                 print(f"  {warning}")
-            print()
-        
-        # Errors
+
         if self.errors:
-            self.print_status("❌ ERRORS:", Colors.RED)
+            self.print_status("\n❌ Errors:", Colors.RED)
             for error in self.errors:
                 print(f"  {error}")
-            print()
-        
-        # Final status
-        if self.errors:
-            self.print_status("❌ VALIDATION FAILED - Please fix errors before committing", Colors.RED)
-        elif self.warnings:
-            self.print_status("⚠️ VALIDATION PASSED WITH WARNINGS - Consider addressing warnings", Colors.YELLOW)
+            print("-" * 50)
+            self.print_status("🚫 Validation Failed", Colors.RED)
         else:
-            self.print_status("✅ ALL VALIDATION CHECKS PASSED", Colors.GREEN)
+            print("-" * 50)
+            self.print_status("✅ Validation Successful", Colors.GREEN)
+        
+        print("="*50 + "\n")
 
 def main():
-    """Main entry point"""
-    validator = PreCommitValidator()
-    success = validator.run_all_checks()
+    """Main function to run the validator"""
+    parser = argparse.ArgumentParser(description="Phase 1 Local Validation Script")
+    parser.add_argument("--skip-performance", action="store_true", help="Omitir tests de rendimiento")
+    parser.add_argument("--verbose", action="store_true", help="Mostrar salida detallada")
+    parser.add_argument("--docker-compose", help="Especificar comando docker-compose (auto-detectado)")
     
-    if success:
-        print()
-        print(f"{Colors.GREEN}🎉 Ready for commit and push!{Colors.NC}")
-    else:
-        print()
-        print(f"{Colors.RED}❌ Please fix errors before proceeding{Colors.NC}")
+    args = parser.parse_args()
+
+    validator = PreCommitValidator(
+        skip_performance=args.skip_performance,
+        verbose=args.verbose,
+        docker_compose_cmd=args.docker_compose
+    )
     
-    sys.exit(0 if success else 1)
+    if not validator.run_all_checks():
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

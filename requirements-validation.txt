@@ -18,3 +18,6 @@ yamllint>=1.26.0
 
 # Note: The script will work without these optional dependencies,
 # but some features may be disabled or have reduced functionality.
+
+pyyaml
+colorama
