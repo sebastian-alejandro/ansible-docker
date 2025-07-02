@@ -241,7 +241,7 @@ main() {
     
     # If we have arguments and we're not in CI, it might be a command to execute
     if [ $# -gt 0 ] && [ "$1" != "/sbin/init" ]; then
-        echo -e "${YELLOW}📋 Executing command: $@${NC}"
+        echo -e "${YELLOW}📋 Executing command: $*${NC}"
         exec "$@"
     fi
     
@@ -345,6 +345,7 @@ main() {
     }
 
     # Cleanup function
+    # shellcheck disable=SC2317
     cleanup() {
         echo "Cleaning up..."
         # Add any cleanup tasks here

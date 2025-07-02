@@ -111,7 +111,7 @@ test_connectivity() {
 }
 
 run_playbook() {
-    read -p "Enter playbook name (e.g., setup-webservers.yml): " playbook
+    read -r -p "Enter playbook name (e.g., setup-webservers.yml): " playbook
     if [ -z "$playbook" ]; then
         echo "No playbook specified."
         return

@@ -132,6 +132,6 @@ if [ $# -eq 0 ] || [ "$1" = "/usr/sbin/sshd" ]; then
     exec /usr/sbin/sshd -D
 else
     # Ejecutar comando especificado
-    log "Ejecutando comando: $@"
+    log "Ejecutando comando: $*"
     exec "$@"
 fi
