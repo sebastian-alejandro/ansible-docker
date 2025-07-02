@@ -54,6 +54,9 @@ RUN dnf -y update && \
         iproute && \
     dnf clean all
 
+# Instalar dos2unix para corregir finales de línea
+RUN dnf -y install dos2unix
+
 # Configurar locale - instalar soporte completo para en_US.UTF-8
 RUN dnf -y reinstall glibc-common && \
     localedef -i en_US -f UTF-8 en_US.UTF-8 && \
@@ -97,8 +100,12 @@ COPY scripts/health-check.sh /usr/local/bin/health-check.sh
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY services/ansible-init.service /etc/systemd/system/
 
-# Hacer ejecutables los scripts
-RUN chmod +x /usr/local/bin/init.sh /usr/local/bin/health-check.sh /usr/local/bin/entrypoint.sh
+# Hacer ejecutables los scripts y convertir finales de línea
+RUN chmod +x /usr/local/bin/*.sh && \
+    dos2unix /usr/local/bin/*.sh
+
+# Habilitar el servicio de inicialización de Ansible
+RUN systemctl enable ansible-init.service
 
 # Exponer puerto SSH
 EXPOSE 22

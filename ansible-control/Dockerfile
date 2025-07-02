@@ -33,7 +33,8 @@ RUN dnf update -y && \
         curl \
         wget \
         vim \
-        rsync && \
+        rsync \
+        dos2unix && \
     dnf clean all
 
 # Instalar Ansible Core (siguiendo las especificaciones del plan)
@@ -76,7 +77,8 @@ COPY scripts/health-check-control.sh /usr/local/bin/
 COPY playbooks/ /ansible/playbooks/
 
 # Hacer scripts ejecutables
-RUN chmod +x /usr/local/bin/*.sh
+RUN chmod +x /usr/local/bin/*.sh && \
+    dos2unix /usr/local/bin/*.sh
 
 # Cambiar permisos y propietario final
 RUN chown -R $ANSIBLE_USER:$ANSIBLE_USER /ansible && \

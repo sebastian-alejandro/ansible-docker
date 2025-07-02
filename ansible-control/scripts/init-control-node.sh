@@ -13,8 +13,7 @@ log() {
 
 # Start SSH service
 log "🔐 Iniciando servicio SSH..."
-sudo systemctl start sshd
-sudo systemctl enable sshd
+/usr/sbin/sshd -D &
 
 # Generate SSH keys if not exist
 if [ ! -f /home/ansible/.ssh/id_rsa ]; then
