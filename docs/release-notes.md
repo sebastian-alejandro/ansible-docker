@@ -1,10 +1,37 @@
-# Release Notes - v1.2.1
+# Release Notes
 
-## Current Release
+## Version 1.3.0 (Current)
 
-**Version**: 1.2.1  
-**Date**: June 27, 2025  
-**Status**: Stable
+**Release Date:** 2025-06-30
+
+This release introduces the Ansible Control Node, providing a centralized and automated environment for managing the Docker-based lab.
+
+### Key Features
+
+*   **Ansible Control Node**: A dedicated CentOS 9 Stream container equipped with Ansible Core and essential collections (`community.general`, `ansible.posix`).
+*   **Automated SSH Management**: Scripts for automatic SSH key generation, distribution, and configuration.
+*   **Dynamic Inventory**: A Python-based script (`dynamic-inventory.py`) to automatically detect and manage an inventory of managed nodes.
+*   **Sample Playbooks**: Includes playbooks for basic tasks like connectivity tests (`ping.yml`), base system setup (`setup-base.yml`), and web server configuration (`setup-webservers.yml`).
+*   **Enhanced CI/CD**: New GitHub Actions workflows to test the Ansible Control Node, including integration and performance tests.
+*   **Python Automation Suite**: A set of cross-platform Python scripts to automate testing, validation, and version control, replacing previous shell scripts.
+
+### Migration from v1.2.1
+
+*   The introduction of the Ansible Control Node changes the architecture. See the main `README.md` for the updated architecture diagram.
+*   Automation has been migrated to Python. Use `python automation.py` for tasks like testing and validation.
+
+## Version 1.2.1
+
+**Release Date:** 2025-06-27
+
+### Summary
+
+This version focused on CI/CD pipeline fixes and stability improvements.
+
+### Changes
+
+*   **Fixed**: Resolved a `netcat` package installation failure in the CI/CD pipeline by specifying `netcat-openbsd` for Ubuntu runners.
+*   **Improved**: Aligned package configurations across different testing workflows for consistency.
 
 ## Features
 

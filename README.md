@@ -3,7 +3,7 @@
 [![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://www.docker.com/)
 [![CentOS](https://img.shields.io/badge/CentOS-9%20Stream-red.svg)](https://www.centos.org/)
 [![Ansible](https://img.shields.io/badge/Ansible-Core-green.svg)](https://www.ansible.com/)
-[![Version](https://img.shields.io/badge/Version-1.2.1-success.svg)](https://github.com/sebastian-alejandro/ansible-docker/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.0-success.svg)](https://github.com/sebastian-alejandro/ansible-docker/releases)
 
 ## Description
 
@@ -11,28 +11,35 @@ Containerized Ansible lab environment using CentOS 9 Stream with Docker Compose 
 
 ### Current Status
 
-- **Version**: 1.2.1
-- **Base OS**: CentOS 9 Stream  
+- **Version**: 1.3.0
+- **Base OS**: CentOS 9 Stream
 - **Orchestration**: Docker Compose
 - **CI/CD**: GitHub Actions automated testing
+- **Ansible Control Node**: Included
 
 ## Architecture
 
+The current architecture includes a dedicated Ansible Control Node for centralized automation.
+
 ```
-┌─────────────────────────┐
-│     Docker Host         │
-│                         │
-│  ┌─────────────────┐   │
-│  │ centos9-node-1  │   │
-│  │ Port: 2201      │   │
-│  │ SSH: 22         │   │
-│  └─────────────────┘   │
-│  ┌─────────────────┐   │
-│  │ centos9-node-2  │   │
-│  │ Port: 2202      │   │
-│  │ SSH: 22         │   │
-│  └─────────────────┘   │
-└─────────────────────────┘
+┌─────────────────────────────────────┐
+│            Docker Host              │
+│                                     │
+│  ┌─────────────────┐                │
+│  │ ansible-control │ ←──────────────┤
+│  │ Port: 2200      │                │
+│  │ SSH: 22         │                │
+│  │ Ansible: ✓      │                │
+│  └─────────────────┘                │
+│           │                         │
+│           ├─────────────────────┐   │
+│           ▼                     ▼   │
+│  ┌─────────────────┐   ┌─────────────────┐
+│  │ centos9-node-1  │   │ centos9-node-2  │
+│  │ Port: 2201      │   │ Port: 2202      │
+│  │ SSH: 22         │   │ SSH: 22         │
+│  └─────────────────┘   └─────────────────┘
+└─────────────────────────────────────┘
 ```
 
 ## Requirements
@@ -52,30 +59,28 @@ cd ansible-docker
 
 ### Start Environment
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 ### Verify Deployment
 ```bash
 docker compose ps
-docker compose logs
+docker compose logs ansible-control
 ```
 
 ## Usage
 
 ### SSH Access
-```bash
-# Node 1
-ssh ansible@localhost -p 2201
 
-# Node 2  
-ssh ansible@localhost -p 2202
+- **Ansible Control Node**: `ssh ansible@localhost -p 2200`
+- **Managed Node 1**: `ssh ansible@localhost -p 2201`
+- **Managed Node 2**: `ssh ansible@localhost -p 2202`
 
-# Default password: ansible123
-```
+Default password for all nodes: `ansible123`
 
 ### Container Shell Access
 ```bash
+docker compose exec ansible-control bash
 docker compose exec centos9-node-1 bash
 docker compose exec centos9-node-2 bash
 ```
@@ -85,7 +90,7 @@ docker compose exec centos9-node-2 bash
 # Start environment
 docker compose up -d
 
-# Stop environment  
+# Stop environment
 docker compose down
 
 # View logs
@@ -95,55 +100,44 @@ docker compose logs
 docker compose up -d --build
 ```
 
-## Configuration
+## Python Scripts for Automation
 
-### Container Specifications
-- **Base OS**: CentOS 9 Stream
-- **SSH User**: ansible (passwordless sudo)
-- **SSH Password**: ansible123
-- **Network**: ansible-network (bridge)
-- **Health Checks**: Enabled for all containers
+This project uses a suite of Python scripts for cross-platform automation and CI/CD tasks.
 
-### Ports Configuration
-| Container | SSH Port | Status |
-|-----------|----------|--------|
-| centos9-node-1 | 2201 | Active |
-| centos9-node-2 | 2202 | Active |
+### `automation.py`
+A centralized script to run all major project tasks.
 
-### Security Configuration
-- SSH password authentication enabled
-- SSH public key authentication enabled  
-- User 'ansible' in wheel group with NOPASSWD sudo
-- Container runs with systemd when available
-
-## Testing
-
-### Automated Testing
+**Usage:**
 ```bash
-# Run functional tests
-python3 test_functional_ci.py
+# Run the full CI/CD pipeline
+python automation.py full
 
-# Check container health
-docker compose ps
+# Run only functional tests
+python automation.py test
+
+# Run pre-commit validation
+python automation.py validate
 ```
 
-### Manual Verification
-```bash
-# Test SSH connectivity
-ssh ansible@localhost -p 2201 "hostname"
+### `test_functional_ci.py`
+Executes functional tests, simulating the CI environment locally.
 
-# Test sudo access
-ssh ansible@localhost -p 2201 "sudo whoami"
+### `pre_commit_check.py`
+Validates code and configuration before commits.
 
-# Test network connectivity
-docker compose exec centos9-node-1 ping centos9-node-2
-```
+### `version_control.py`
+Automates versioning, commits, and tagging.
+
+For more details on the Python scripts, see the [Technical Reference](docs/technical-reference.md).
 
 ## Documentation
 
-- [Installation Guide](docs/README.md)
-- [Change Log](CHANGELOG.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
+- [**Project Architecture**](docs/project-architecture.md): Detailed architecture and design.
+- [**Development Plan**](docs/development-plan-v1.3.0.md): Roadmap for version 1.3.0.
+- [**Technical Reference**](docs/technical-reference.md): Commands, scripts, and technical details.
+- [**Release Notes**](docs/release-notes.md): Features and updates for the current version.
+- [**Change Log**](CHANGELOG.md): History of changes.
+- [**Contributing Guidelines**](CONTRIBUTING.md): How to contribute to the project.
 
 ## Troubleshooting
 
@@ -152,38 +146,31 @@ docker compose exec centos9-node-1 ping centos9-node-2
 **Container fails to start**
 ```bash
 # Check container logs
-docker compose logs centos9-node-1
+docker compose logs <container_name>
 
 # Verify systemd status
-docker compose exec centos9-node-1 systemctl status
+docker compose exec <container_name> systemctl status
 ```
 
 **SSH connection refused**
 ```bash
 # Verify SSH service status
-docker compose exec centos9-node-1 systemctl status sshd
+docker compose exec <container_name> systemctl status sshd
 
 # Check port mapping
 docker compose ps
 ```
 
-**Health check failing**
-```bash
-# Manual health check
-docker compose exec centos9-node-1 systemctl is-system-running
-
-# Restart container
-docker compose restart centos9-node-1
-```
-
 ## Contributing
 
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/name`
-3. Commit changes: `git commit -m 'Add feature'`
-4. Push to branch: `git push origin feature/name`
-5. Submit pull request
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feature/your-feature`.
+3. Commit your changes: `git commit -m 'Add your feature'`.
+4. Push to the branch: `git push origin feature/your-feature`.
+5. Submit a pull request.
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License - see the [LICENSE](LICENSE) file for details.
