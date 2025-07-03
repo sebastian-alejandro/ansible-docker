@@ -93,7 +93,7 @@ class GitVersionControl:
 
             # A non-zero exit code from `git diff --quiet` means there are differences
             if result.returncode != 0:
-                commit_cmd = ["git", "commit", "-m", group["message"]]
+                commit_cmd = ["git", "commit", "-m", group["message"], "--"] + group["files"]
                 commit_result = self.run_command(commit_cmd)
                 if commit_result.returncode == 0:
                     self.print_status(f"✅ Commit created: {group['message']}", Colors.GREEN)
@@ -104,6 +104,8 @@ class GitVersionControl:
                     return
 
         # Commit any remaining changes with a general message
+        # We need to check for unstaged changes that are left
+        self.run_command(["git", "add", "-A"])
         if self.check_git_status():
              self.print_status("⚙️ Committing remaining changes...", Colors.BLUE)
              final_commit_cmd = ["git", "commit", "-m", "chore: Apply remaining updates"]
