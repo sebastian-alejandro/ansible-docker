@@ -3,43 +3,26 @@
 [![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://www.docker.com/)
 [![CentOS](https://img.shields.io/badge/CentOS-9%20Stream-red.svg)](https://www.centos.org/)
 [![Ansible](https://img.shields.io/badge/Ansible-Core-green.svg)](https://www.ansible.com/)
-[![Version](https://img.shields.io/badge/Version-1.3.0-success.svg)](https://github.com/sebastian-alejandro/ansible-docker/releases)
+[![Version](https://img.shields.io/badge/Version-1.4.0-success.svg)](https://github.com/sebastian-alejandro/ansible-docker/releases)
 
 ## Description
 
 Containerized Ansible lab environment using CentOS 9 Stream with Docker Compose orchestration. Provides isolated, reproducible infrastructure for Ansible automation testing and development.
 
-### Current Status
-
-- **Version**: 1.3.0
-- **Base OS**: CentOS 9 Stream
-- **Orchestration**: Docker Compose
-- **CI/CD**: GitHub Actions automated testing
-- **Ansible Control Node**: Included
-
 ## Architecture
 
 The current architecture includes a dedicated Ansible Control Node for centralized automation.
 
-```
-┌─────────────────────────────────────┐
-│            Docker Host              │
-│                                     │
-│  ┌─────────────────┐                │
-│  │ ansible-control │ ←──────────────┤
-│  │ Port: 2200      │                │
-│  │ SSH: 22         │                │
-│  │ Ansible: ✓      │                │
-│  └─────────────────┘                │
-│           │                         │
-│           ├─────────────────────┐   │
-│           ▼                     ▼   │
-│  ┌─────────────────┐   ┌─────────────────┐
-│  │ centos9-node-1  │   │ centos9-node-2  │
-│  │ Port: 2201      │   │ Port: 2202      │
-│  │ SSH: 22         │   │ SSH: 22         │
-│  └─────────────────┘   └─────────────────┘
-└─────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Docker Host
+        ansible-control(ansible-control <br> Port: 2200 <br> SSH: 22 <br> Ansible: ✓)
+        centos9-node-1(centos9-node-1 <br> Port: 2201 <br> SSH: 22)
+        centos9-node-2(centos9-node-2 <br> Port: 2202 <br> SSH: 22)
+    end
+
+    ansible-control -- SSH --> centos9-node-1
+    ansible-control -- SSH --> centos9-node-2
 ```
 
 ## Requirements

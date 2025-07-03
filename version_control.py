@@ -15,14 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
 
-class Colors:
-    """ANSI color codes for terminal output"""
-    RED = '\033[0;31m'
-    GREEN = '\033[0;32m'
-    YELLOW = '\033[1;33m'
-    BLUE = '\033[0;34m'
-    CYAN = '\033[0;36m'
-    NC = '\033[0m'  # No Color
+from utils import Colors
 
 class GitVersionControl:
     """Git version control automation"""
@@ -80,18 +73,13 @@ class GitVersionControl:
                 "message": "refactor(scripts): Consolidate validation and versioning scripts",
                 "files": [
                     "version_control.py", "pre_commit_check.py",
-                    "validate_phase1.py", "create_github_release.py", "release_phase1.py",
-                    "manage-sprint2.sh", "requirements-validation.txt"
+                    "requirements-validation.txt"
                 ]
             },
             {
                 "message": "docs: Consolidate and clean up documentation files",
                 "files": [
-                    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/",
-                    "RELEASE_NOTES_v1.3.0.md", "phase1-summary.md",
-                    "README_new.md", "CHANGELOG_new.md", "CONTRIBUTING_new.md",
-                    "PYTHON_SCRIPTS_README.md", "docs/README.md", "docs/README_new.md",
-                    "docs/phase1-testing-suite.md", "docs/validate-phase1-python.md"
+                    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/"
                 ]
             }
         ]
@@ -208,6 +196,7 @@ class GitHubReleaseCreator:
 
 def main():
     """Main function to drive the script"""
+    Colors.init()
     parser = argparse.ArgumentParser(description="Git Version Control and Release Tool")
     parser.add_argument("action", choices=["commit", "tag", "release"], help="The action to perform")
     parser.add_argument("--version", help="The version number to use (e.g., 1.3.0)")

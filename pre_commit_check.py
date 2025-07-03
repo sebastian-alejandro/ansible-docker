@@ -9,12 +9,14 @@ Validates changes before committing
 import subprocess
 import sys
 import os
-import json
 from pathlib import Path
 import time
 import argparse
 import platform
 from typing import List, Dict, Optional, Tuple
+import glob
+
+from utils import Colors
 
 # Try to import yaml, but make it optional
 try:
@@ -37,28 +39,6 @@ CRITICAL_FILES = [
     "ansible-control/playbooks/setup-webservers.yml",
     "docker-compose.yml"
 ]
-
-class Colors:
-    """ANSI color codes for terminal output"""
-    if platform.system() == "Windows":
-        try:
-            import colorama
-            colorama.init()
-            RED = '\033[0;31m'
-            GREEN = '\033[0;32m'
-            YELLOW = '\033[1;33m'
-            BLUE = '\033[0;34m'
-            CYAN = '\033[0;36m'
-            NC = '\033[0m'
-        except ImportError:
-            RED = GREEN = YELLOW = BLUE = CYAN = NC = ''
-    else:
-        RED = '\033[0;31m'
-        GREEN = '\033[0;32m'
-        YELLOW = '\033[1;33m'
-        BLUE = '\033[0;34m'
-        CYAN = '\033[0;36m'
-        NC = '\033[0m'
 
 class Logger:
     """Clase para logging con colores"""
@@ -128,10 +108,6 @@ class PreCommitValidator:
             self.logger.error(f"Excepción al ejecutar el comando: {e}")
             return subprocess.CompletedProcess(command, 1, "", str(e))
 
-    def print_status(self, message: str, color: str = Colors.YELLOW):
-        """Print a colored status message"""
-        print(f"{color}{message}{Colors.NC}")
-
     def check_critical_files(self) -> bool:
         """Verificar la existencia de archivos críticos"""
         self.logger.info("Verificando la existencia de archivos críticos...")
@@ -186,23 +162,15 @@ class PreCommitValidator:
 
     def check_yaml_syntax(self) -> bool:
         """Validate YAML files syntax"""
-        self.print_status("🔍 Validating YAML files...", Colors.BLUE)
-        
-        yaml_files = [
-            "docker-compose.yml",
-            "ansible-control/playbooks/ping.yml",
-            "ansible-control/playbooks/setup-base.yml",
-            "ansible-control/playbooks/setup-webservers.yml",
-            "ansible-control/config/all.yml",
-            "ansible-control/config/managed_nodes.yml"
-        ]
+        self.logger.info("Validating YAML files...")
         
         if not HAS_YAML:
-            self.warnings.append("⚠️ PyYAML not available - skipping YAML validation")
-            self.warnings.append("  Install with: pip install pyyaml")
+            self.logger.warning("PyYAML not available - skipping YAML validation. Install with: pip install pyyaml")
             return True
         
         all_valid = True
+        yaml_files = glob.glob("**/*.yml", recursive=True) + glob.glob("**/*.yaml", recursive=True)
+        
         for yaml_file in yaml_files:
             if os.path.exists(yaml_file):
                 try:
@@ -219,7 +187,7 @@ class PreCommitValidator:
 
     def run_all_checks(self) -> bool:
         """Run all pre-commit checks"""
-        self.print_status("🚀 Starting pre-commit validation...", Colors.CYAN)
+        self.logger.info("🚀 Starting pre-commit validation...")
         
         # Static checks
         self.check_yaml_syntax()
@@ -250,31 +218,33 @@ class PreCommitValidator:
     def print_summary(self):
         """Print the summary of all checks"""
         print("\n" + "="*50)
-        self.print_status("📊 Validation Summary", Colors.CYAN)
+        self.logger.info("📊 Validation Summary")
         print("="*50)
 
         for check in self.passed_checks:
             print(f"{Colors.GREEN}{check}{Colors.NC}")
 
         if self.warnings:
-            self.print_status("\n⚠️ Warnings:", Colors.YELLOW)
+            self.logger.warning("\n⚠️ Warnings:")
             for warning in self.warnings:
                 print(f"  {warning}")
 
         if self.errors:
-            self.print_status("\n❌ Errors:", Colors.RED)
+            self.logger.error("\n❌ Errors:")
             for error in self.errors:
                 print(f"  {error}")
             print("-" * 50)
-            self.print_status("🚫 Validation Failed", Colors.RED)
+            self.logger.error("🚫 Validation Failed")
         else:
             print("-" * 50)
-            self.print_status("✅ Validation Successful", Colors.GREEN)
+            self.logger.success("✅ Validation Successful")
         
         print("="*50 + "\n")
 
+
 def main():
     """Main function to run the validator"""
+    Colors.init()
     parser = argparse.ArgumentParser(description="Phase 1 Local Validation Script")
     parser.add_argument("--skip-performance", action="store_true", help="Omitir tests de rendimiento")
     parser.add_argument("--verbose", action="store_true", help="Mostrar salida detallada")
